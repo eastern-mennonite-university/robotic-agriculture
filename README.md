@@ -9,11 +9,11 @@ First time:
 ```
 python -m venv venv
 pip install -r requirements.txt
-venv\bin\activate
+venv\Scripts\activate
 ```
 
 Each time after that
 ```
-venv\bin\activate
+venv\Scripts\activate
 ```
 before running any files, installing packages, etc.
