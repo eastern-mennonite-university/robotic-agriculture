@@ -1,2 +1,3 @@
-print("hello wordl")
+from machine import Pin
 
+ledPin = Pin()
