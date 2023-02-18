@@ -1,5 +1,5 @@
 
-import machine
+import machine, time
 from machine import Pin
 
 # Define all of the pins
@@ -24,8 +24,12 @@ yn_lim_pin = Pin(33, Pin.IN, Pin.PULL_UP)
 zp_lim_pin = Pin(32, Pin.IN, Pin.PULL_UP)
 zn_lim_pin = Pin(35, Pin.IN, Pin.PULL_UP)
 
-
-
+# Everything inside this will run forever
+while True:
+    z_step_pin.on()
+    time.sleep(0.005)
+    z_step_pin.off()
+    time.sleep(0.005)
 
 
 #Reference: https://icircuit.net/micropython-controlling-servo-esp32-nodemcu/2385
