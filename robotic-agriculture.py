@@ -33,9 +33,15 @@ def main():
     motor_system.set_max_velocity(1)
     
     # Everything inside this will run forever
+    motor_system.set_velocity(0, 0, 440)
+    change = .01
+    speed = 10
     while True:
-        motor_system.step(MotorSystem.Z, False)
-        time.sleep(1)
+        motor_system.run_speed()
+        speed += change
+        if speed > 500: change = -.002
+        if speed < 10: change = .002
+        motor_system.set_velocity(0, 0, speed)
 
 class MotorSystem:
     '''Class designed to abstract away the problems with our motor set up. 
@@ -50,6 +56,9 @@ class MotorSystem:
         self.set_position(0, 0, 0)
         self.set_velocity(0, 0, 0)
         self.set_target(0, 0, 0)
+        self.x_previous_step_ticks = 0
+        self.y_previous_step_ticks = 0
+        self.z_previous_step_ticks = 0
         self.set_pins(x1_step_pin, y_step_pin, z_step_pin, dir_pin)
 
     def set_target(self, x, y, z):
@@ -134,7 +143,17 @@ class MotorSystem:
 
     def run_speed(self):
         '''Checks the timers for each motor and does a `step()` if needed.'''
-        
+        current_time = time.ticks_us()
+        # print(current_time)
+        if time.ticks_diff(current_time, self.x_previous_step_ticks) >= self.x_step_interval:
+            self.step(MotorSystem.X, False) # Todo: add functionality for reverse here
+            self.x_previous_step_ticks = time.ticks_add(self.x_previous_step_ticks, self.x_step_interval)
+        if time.ticks_diff(current_time, self.y_previous_step_ticks) >= self.y_step_interval:
+            self.step(MotorSystem.Y, False) # Todo: add functionality for reverse here
+            self.y_previous_step_ticks = time.ticks_add(self.y_previous_step_ticks, self.y_step_interval)
+        if time.ticks_diff(current_time, self.z_previous_step_ticks) >= self.z_step_interval:
+            self.step(MotorSystem.Z, False) # Todo: add functionality for reverse here
+            self.z_previous_step_ticks = time.ticks_add(self.z_previous_step_ticks, self.z_step_interval)
 
 
 
