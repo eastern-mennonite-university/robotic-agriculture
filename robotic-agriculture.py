@@ -29,13 +29,15 @@ zn_lim_pin = Pin(35, Pin.IN, Pin.PULL_UP)
 
 def main():
     motor_system = MotorSystem()
+    motor_system.set_max_acceleration(.1)
+    motor_system.set_max_velocity(1)
     
     # Everything inside this will run forever
     while True:
         z_step_pin.on()
-        time.sleep(0.005)
+        time.sleep(0.01)
         z_step_pin.off()
-        time.sleep(0.005)
+        time.sleep(0.01)
 
 class MotorSystem:
     '''Class designed to abstract away the problems with our motor set up. 
@@ -46,18 +48,31 @@ class MotorSystem:
     Z = 2
     def __init__(self):
         '''Initialize the motors'''
-        pass
+        self.x_pos = 0
+        self.y_pos = 0
+        self.z_pos = 0
+        self.x_vel = 0
+        self.y_vel = 0
+        self.z_vel = 0
+        self.set_target(0, 0, 0)
 
     def set_target(self, x, y, z):
         '''Set the target position that the gantry will go to in the future'''
-        pass
+        self.x_tar = x
+        self.y_tar = y
+        self.z_tar = z
 
     def set_max_velocity(self, max_velocity, direction):
-        '''Set the maximum velocity in a given direction (0=X, 1=Y, 2=Z)'''
-        pass
+        '''Set the maximum velocity in a given direction (0=X, 1=Y, 2=Z, None=All directions)'''
+        if direction in (MotorSystem.X, None): self.max_x_vel = max_velocity
+        if direction in (MotorSystem.Y, None): self.max_y_vel = max_velocity
+        if direction in (MotorSystem.Z, None): self.max_z_vel = max_velocity
 
-    def set_max_acceleration(self, max_acceleration, direction):
-        '''Set the maximum velocity in a given direction (0=X, 1=Y, 2=Z)'''
+    def set_max_acceleration(self, max_acceleration, direction=None):
+        '''Set the maximum velocity in a given direction (0=X, 1=Y, 2=Z, None=All directions)'''
+        if direction in (MotorSystem.X, None): self.max_x_accel = max_acceleration
+        if direction in (MotorSystem.Y, None): self.max_y_accel = max_acceleration
+        if direction in (MotorSystem.Z, None): self.max_z_accel = max_acceleration
         pass
 
     def distance_to_steps(self, distance, direction):
@@ -74,7 +89,13 @@ class MotorSystem:
 
     def update(self):
         '''Should be called every clock cycle. This function will pulse the stepper motors needed to move the target position'''
+        self.update_vel()
+
+
+    def update_vel(self):
+        '''Is called by update(). Changes the stepper velocities at the rate of `self.max_accel`. This function makes sure that we don't accelerate or decelerate too quickly'''
         pass
+
 
 #Reference: https://icircuit.net/micropython-controlling-servo-esp32-nodemcu/2385
 def set_servo_pos(duty):
