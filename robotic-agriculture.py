@@ -1,5 +1,5 @@
 
-import machine, time
+import machine, time, math
 from machine import Pin
 
 # Define all of the pins
@@ -65,10 +65,14 @@ class MotorSystem:
         self.z_pos = z
 
     def set_velocity(self, xv, yv, zv):
-        '''Set the current velocities'''
-        self.x_vel = 0
-        self.y_vel = 0
-        self.z_vel = 0
+        '''Set the current velocities in steps/sec'''
+        self.x_vel = xv
+        self.y_vel = yv
+        self.z_vel = zv
+        # Set the interval between steps in microseconds 
+        self.x_step_interval = (math.inf if xv==0 else int(1_000_000 * 1/xv))
+        self.y_step_interval = (math.inf if yv==0 else int(1_000_000 * 1/yv))
+        self.z_step_interval = (math.inf if zv==0 else int(1_000_000 * 1/zv))
 
     def set_max_velocity(self, max_velocity, direction=None):
         '''Set the maximum velocity in a given direction (0=X, 1=Y, 2=Z, None=All directions). Only needs to be called once.'''
@@ -128,6 +132,9 @@ class MotorSystem:
             time.sleep_us(self.min_pulse_width)
             pulse_pin.off()
 
+    def run_speed(self):
+        '''Checks the timers for each motor and does a `step()` if needed.'''
+        
 
 
 
