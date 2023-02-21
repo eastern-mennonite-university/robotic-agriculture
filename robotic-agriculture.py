@@ -34,10 +34,8 @@ def main():
     
     # Everything inside this will run forever
     while True:
-        z_step_pin.on()
-        time.sleep(0.01)
-        z_step_pin.off()
-        time.sleep(0.01)
+        motor_system.step(MotorSystem.Z, False)
+        time.sleep(1)
 
 class MotorSystem:
     '''Class designed to abstract away the problems with our motor set up. 
@@ -48,7 +46,7 @@ class MotorSystem:
     Z = 2
     def __init__(self):
         '''Initialize the motors'''
-        self.min_pulse_width = 3 # Minimum width of pulse in microseconds. Minimum for DRV8825 is 1.9us
+        self.min_pulse_width = 3 # Minimum width of pulse in microseconds. Minimum for DRV8825 is 1.9us, 3 gives us some wiggle room
         self.set_position(0, 0, 0)
         self.set_velocity(0, 0, 0)
         self.set_target(0, 0, 0)
@@ -127,7 +125,7 @@ class MotorSystem:
         elif direction == MotorSystem.Z: pulse_pin = self.z_pin
         if pulse_pin:
             pulse_pin.on()
-            time.sleepus(self.min_pulse_width)
+            time.sleep_us(self.min_pulse_width)
             pulse_pin.off()
 
 
