@@ -58,7 +58,7 @@ class MotorSystem:
         self.z_motor = Motor(x1_step_pin, dir_pin)
         pass
 class Motor:
-    def __init__(self, step_pin, dir_pin):
+    def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin):
         '''Initialize the motor'''
         self.min_pulse_width = 3 # Minimum width of pulse in microseconds. Minimum for DRV8825 is 1.9us, 3 gives us some wiggle room
         self.set_position(0)
@@ -68,7 +68,7 @@ class Motor:
         self.set_pin(step_pin, dir_pin)
         pass
 
-    def set_pin(self, step, dir):
+    def set_pin(self, step: machine.Pin, dir: machine.Pin):
         '''Set the pins to be used for stepping the motor.'''
         self.step_pin = step
         self.dir_pin = dir
@@ -81,25 +81,25 @@ class Motor:
         '''Is called by update(). Changes the stepper velocity at the rate of `self.max_accel`. This function makes sure that we don't accelerate or decelerate too quickly'''
         pass
 
-    def set_target(self, tar):
+    def set_target(self, tar: int):
         '''Set the target position that the motor will go to in the future'''
         self.target = tar
 
-    def set_position(self, pos):
+    def set_position(self, pos: int):
         '''Set the current position of the motor. Note that this is *not* the target position'''
         self.position = pos
 
-    def set_velocity(self, v):
+    def set_velocity(self, v: float):
         '''Set the current velocity in steps/sec'''
         self.velocity = v
         # Set the interval between steps in microseconds 
         self.step_interval = (math.inf if v==0 else int(1_000_000 * 1/v))
 
-    def set_max_velocity(self, max_velocity):
+    def set_max_velocity(self, max_velocity: float):
         '''Set the maximum velocity. Only needs to be called once.'''
         self.max_vel = max_velocity
 
-    def set_max_acceleration(self, max_acceleration):
+    def set_max_acceleration(self, max_acceleration: float):
         '''Set the maximum velocity in a given direction (0=X, 1=Y, 2=Z, None=All directions)'''
         self.max_accel = max_acceleration
 
@@ -111,7 +111,7 @@ class Motor:
             self.step(False) # Todo: add functionality for reverse here
             self.previous_step_ticks = time.ticks_add(self.previous_step_ticks, self.step_interval)
 
-    def step(self, reverse=False):
+    def step(self, reverse: bool=False):
         '''Perform one step. If `reverse` is set, go the opposite way. Uses `self.min_pulse_width` to calculate length of pulse'''
         # First, set the direction pin
         if (reverse): 
@@ -124,12 +124,12 @@ class Motor:
         time.sleep_us(self.min_pulse_width)
         self.step_pin.off()
 
-    def distance_to_steps(self, distance, direction):
-        '''Converts a distance in m to a number of steps in a given direction (X=0, Y=1, Z=2). See also `steps_to_distance`. '''
+    def distance_to_steps(self, distance: float):
+        '''Converts a distance in m to a number of steps. See also `steps_to_distance`. '''
         pass
 
-    def steps_to_distance(self, steps, direction):
-        '''Converts a number of steps in a given direction (X=0, Y=1, Z=2) to distance in m. See also `steps_to_distance`. '''
+    def steps_to_distance(self, steps: int):
+        '''Converts a number of steps to distance in m. See also `steps_to_distance`. '''
         pass
 
     def calibrate(self):
@@ -137,7 +137,7 @@ class Motor:
         pass
         
 #Reference: https://icircuit.net/micropython-controlling-servo-esp32-nodemcu/2385
-def set_servo_pos(duty):
+def set_servo_pos(duty: float):
     '''Limits are 27 (dispense) and 65 (collect)'''
     if (20<=duty<=70):
         servo.duty(duty) 
