@@ -28,6 +28,7 @@ zn_lim_pin = Pin(35, Pin.IN, Pin.PULL_UP)
 
 
 def main():
+    print('Hello, world!')
     motor_system = MotorSystem()
     motor_system.set_max_acceleration(.1)
     motor_system.set_max_velocity(1)
@@ -42,6 +43,7 @@ def main():
         if speed > 500: change = -.002
         if speed < 10: change = .002
         motor_system.set_velocity(0, 0, speed)
+        set_servo_pos(int(speed/6))
 
 class MotorSystem:
     '''Class designed to abstract away the problems with our motor set up. 
