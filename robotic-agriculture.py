@@ -30,20 +30,10 @@ zn_lim_pin = Pin(35, Pin.IN, Pin.PULL_UP)
 def main():
     print('Hello, world!')
     motor_system = MotorSystem()
-    motor_system.set_max_acceleration(.1)
-    motor_system.set_max_velocity(1)
-    
+
     # Everything inside this will run forever
-    motor_system.set_velocity(0, 0, 440)
-    change = .01
-    speed = 10
     while True:
-        motor_system.run_speed()
-        speed += change
-        if speed > 500: change = -.002
-        if speed < 10: change = .002
-        motor_system.set_velocity(0, 0, speed)
-        set_servo_pos(int(speed/6))
+        pass
 
 class MotorSystem:
     '''Class designed to abstract away the problems with our motor set up. 
@@ -54,21 +44,34 @@ class MotorSystem:
     Z = 2
     def __init__(self):
         self.x_motor = Motor(x1_step_pin, dir_pin)
-        self.y_motor = Motor(x1_step_pin, dir_pin)
-        self.z_motor = Motor(x1_step_pin, dir_pin)
-        pass
-class Motor:
-    def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin):
-        '''Initialize the motor'''
-        self.min_pulse_width = 3 # Minimum width of pulse in microseconds. Minimum for DRV8825 is 1.9us, 3 gives us some wiggle room
-        self.set_position(0)
-        self.set_velocity(0)
-        self.set_target(0)
-        self.previous_step_ticks = 0
-        self.set_pin(step_pin, dir_pin)
+        self.y_motor = Motor(y_step_pin, dir_pin)
+        self.z_motor = Motor(z_step_pin, dir_pin)
         pass
 
-    def set_pin(self, step: machine.Pin, dir: machine.Pin):
+    def set_position(self, x_pos: int, y_pos: int, z_pos: int):
+        '''Set positions for all of the motors at once'''
+        self.x_motor.set_position(x_pos)
+        self.y_motor.set_position(y_pos)
+        self.z_motor.set_position(z_pos)
+
+    def set_target(self, x_tar: int, y_tar: int, z_tar: int):
+        self.x_motor.set_target(x_tar)
+        self.y_motor.set_target(y_tar)
+        self.z_motor.set_target(z_tar)
+class Motor:
+    def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin, position: int=0, max_velocity: float=.1, max_acceleration: float=.05, min_pulse_width: int=3):
+        '''Initialize the motor'''
+        self.min_pulse_width = min_pulse_width # Minimum width of pulse in microseconds. Minimum for DRV8825 is 1.9us, 3 gives us some wiggle room
+        self.set_position(position)
+        self.set_target(position)
+        self.set_velocity(0)
+        self.set_max_velocity(max_velocity)
+        self.set_max_acceleration(max_acceleration)
+        self.previous_step_ticks = 0
+        self.set_pins(step_pin, dir_pin)
+        pass
+
+    def set_pins(self, step: machine.Pin, dir: machine.Pin):
         '''Set the pins to be used for stepping the motor.'''
         self.step_pin = step
         self.dir_pin = dir
@@ -79,7 +82,8 @@ class Motor:
 
     def update_vel(self):
         '''Is called by update(). Changes the stepper velocity at the rate of `self.max_accel`. This function makes sure that we don't accelerate or decelerate too quickly'''
-        pass
+        distance_remaining = self.target - self.position
+        pass #TODO: implement functionality
 
     def set_target(self, tar: int):
         '''Set the target position that the motor will go to in the future'''
