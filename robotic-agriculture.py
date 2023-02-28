@@ -2,6 +2,15 @@
 import machine, time, math
 from machine import Pin
 
+# List of things that still need done
+# - [ ] Automated go to position with stepper motors
+# - [ ] Solenoid valve control
+# - [ ] Flow meter reading
+# - [ ] Soil sensor readings
+# - [ ] Seed dispenser control
+# - [ ] User interface
+
+
 # Define all of the pins
 dir_pin = Pin(19, Pin.OUT)
 x1_step_pin = Pin(13, Pin.OUT)
@@ -31,9 +40,23 @@ def main():
     print('Hello, world!')
     motor_system = MotorSystem()
 
+    frequency = 50
     # Everything inside this will run forever
+    serial = machine.UART(1, 115200, tx=1, rx=3)
+    serial.init(115200)
     while True:
-        pass
+        
+        if serial.any():
+            try:
+                message = serial.readline().decode('utf-8')
+                frequency = float(message.strip())
+            except:
+                frequency = 20
+
+            
+
+        motor_system.z_motor.set_velocity(frequency)
+        motor_system.z_motor.run_speed()
 
 class MotorSystem:
     '''Class designed to abstract away the problems with our motor set up. 
@@ -113,7 +136,10 @@ class Motor:
         # print(current_time)
         if time.ticks_diff(current_time, self.previous_step_ticks) >= self.step_interval:
             self.step(False) # Todo: add functionality for reverse here
-            self.previous_step_ticks = time.ticks_add(self.previous_step_ticks, self.step_interval)
+            # This equation is confusing because we need to make sure our previous
+            # step is at most `step_interval` us behind the last step
+            self.previous_step_ticks = \
+            time.ticks_add(self.previous_step_ticks, math.floor(time.ticks_diff(current_time, self.previous_step_ticks)/self.step_interval)*self.step_interval)
 
     def step(self, reverse: bool=False):
         '''Perform one step. If `reverse` is set, go the opposite way. Uses `self.min_pulse_width` to calculate length of pulse'''
