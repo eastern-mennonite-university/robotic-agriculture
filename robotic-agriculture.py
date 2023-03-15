@@ -220,12 +220,6 @@ class SeedDispenser:
     def collect(self):
         self.servo.duty(SeedDispenser.COLLECT_DUTY)
 
-    
-#Reference: https://icircuit.net/micropython-controlling-servo-esp32-nodemcu/2385
-def set_servo_pos(duty: float):
-    '''Limits are 27 (dispense) and 65 (collect)'''
-    if (20<=duty<=70):
-        servo.duty(duty) 
 
 if __name__=='__main__':
     main()
