@@ -3,11 +3,12 @@ import machine, time, math
 from machine import Pin
 
 # List of things that still need done
-# - [ ] Automated go to position with stepper motors
+# - [X~] Automated go to position with stepper motors
+#    - [ ] Ramp velocity for stepper motors
 # - [ ] Solenoid valve control
 # - [ ] Flow meter reading
 # - [ ] Soil sensor readings
-# - [ ] Seed dispenser control
+# - [X] Seed dispenser control
 # - [ ] User interface
 
 
@@ -208,6 +209,8 @@ class Motor:
         pass
         
 class SeedDispenser:
+    # These denote the duty cycles of the collect and dispense positions
+    # of the servo motor
     DISPENSE_DUTY = 27
     COLLECT_DUTY = 65
     def __init___(self, servo_pin):
@@ -215,11 +218,29 @@ class SeedDispenser:
         self.servo = machine.PWM(servo_pin, freq=50)
 
     def dispense(self):
+        '''Moves servo motor to dispense position'''
         self.servo.duty(SeedDispenser.DISPENSE_DUTY)
 
     def collect(self):
+        '''Moves servo motor to collect position'''
         self.servo.duty(SeedDispenser.COLLECT_DUTY)
 
+class WaterSystem:
+    def __init__(self, valve_pin, flow_pin):
+        self.valve_pin = valve_pin
+        self.flow_pin = flow_pin
+        self.flow = 0
+        self.dispense_target = 0
+
+    def update(self):
+        '''Opens/closes valve based on what is needed'''
+        # TODO: Implement functionality here
+        pass
+
+
+    
+
+    
 
 if __name__=='__main__':
     main()
