@@ -35,7 +35,8 @@ yn_lim_pin = Pin(33, Pin.IN, Pin.PULL_UP)
 zp_lim_pin = Pin(32, Pin.IN, Pin.PULL_UP)
 zn_lim_pin = Pin(35, Pin.IN, Pin.PULL_UP)
 
-
+def handle_interrupt(pin):
+    pass
 
 def main():
     print('Script started')
@@ -43,6 +44,9 @@ def main():
     motor_system.set_position(0, 0, 0)
 
     seed_dispenser = SeedDispenser(servo_pin)
+    water_system = WaterSystem(valve_pin, flow_pin)
+
+    flow_pin.irq(trigger=Pin.IRQ_RISING, handler=water_system.water_pulse) 
 
     frequency = 50
     # Everything inside this will run forever
@@ -226,6 +230,11 @@ class SeedDispenser:
         self.servo.duty(SeedDispenser.COLLECT_DUTY)
 
 class WaterSystem:
+    '''Class representing the solenoid valve and the flow meter'''
+    # From flow meter datasheet: f(requency) = 11*Q, where Q=L/min
+    # So ratio is 660 pulses/Liter
+    # or 1.515 mL per pulse
+    FLOW_RATE = 1.515
     def __init__(self, valve_pin, flow_pin):
         self.valve_pin = valve_pin
         self.flow_pin = flow_pin
@@ -236,6 +245,12 @@ class WaterSystem:
         '''Opens/closes valve based on what is needed'''
         # TODO: Implement functionality here
         pass
+
+    def water_pulse(self, pin):
+        '''Called by interrupt'''
+        self.flow += WaterSystem.FLOW_RATE
+    
+
 
 
     
