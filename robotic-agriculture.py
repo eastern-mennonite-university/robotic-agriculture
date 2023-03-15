@@ -20,7 +20,7 @@ z_step_pin = Pin(18, Pin.OUT)
 
 valve_pin = Pin(22, Pin.OUT)
 servo_pin = Pin(21, Pin.OUT)
-servo = machine.PWM(servo_pin, freq=50)
+
 
 flow_pin = Pin(23, Pin.IN)
 moisture1_pin = Pin(34, Pin.IN)
@@ -37,9 +37,11 @@ zn_lim_pin = Pin(35, Pin.IN, Pin.PULL_UP)
 
 
 def main():
-    print('Hello, world!')
+    print('Script started')
     motor_system = MotorSystem()
     motor_system.set_position(0, 0, 0)
+
+    seed_dispenser = SeedDispenser(servo_pin)
 
     frequency = 50
     # Everything inside this will run forever
@@ -49,6 +51,18 @@ def main():
     at_start = True
     while True:
         motor_system.update()
+        if motor_system.at_target():
+            at_start = not at_start
+            # Dispense a seed
+            seed_dispenser.collect()
+            time.sleep(1)
+            seed_dispenser.dispense()
+            time.sleep(1)
+            seed_dispenser.collect()
+            if at_start:
+                motor_system.set_target(0, 0, 0)
+            else:
+                motor_system.set_target(1000, 1000, 1000)
 
         # if serial.any():
         #     try:
@@ -90,6 +104,7 @@ class MotorSystem:
         self.z_motor.update()
 
     def at_target(self):
+        '''Returns true if all of its motors are at the target position'''
         return all([motor.at_target() for motor in [self.x_motor, self.y_motor, self.z_motor]])
 
 class Motor:
@@ -177,6 +192,7 @@ class Motor:
         self.step_pin.off()
 
     def at_target(self):
+        '''Returns true if the motor is at its target position'''
         return self.target==self.position
 
     def distance_to_steps(self, distance: float):
@@ -191,6 +207,20 @@ class Motor:
         '''calibration subroutine - not sure how this will work'''
         pass
         
+class SeedDispenser:
+    DISPENSE_DUTY = 27
+    COLLECT_DUTY = 65
+    def __init___(self, servo_pin):
+        self.pos = 0
+        self.servo = machine.PWM(servo_pin, freq=50)
+
+    def dispense(self):
+        self.servo.duty(SeedDispenser.DISPENSE_DUTY)
+
+    def collect(self):
+        self.servo.duty(SeedDispenser.COLLECT_DUTY)
+
+    
 #Reference: https://icircuit.net/micropython-controlling-servo-esp32-nodemcu/2385
 def set_servo_pos(duty: float):
     '''Limits are 27 (dispense) and 65 (collect)'''
