@@ -243,19 +243,20 @@ class WaterSystem:
 
     def update(self):
         '''Opens/closes valve based on what is needed'''
-        # TODO: Implement functionality here
-        pass
+        if self.flow < self.dispense_target:
+            self.valve_pin.on()
+        else:
+            self.valve_pin.off()
+            self.flow = 0
+            self.dispense_target = 0
+
+    def dispense(self, dispense_target):
+        '''Set the target amount of water to dispense, in mL'''
+        self.dispense_target = dispense_target
 
     def water_pulse(self, pin):
         '''Called by interrupt'''
         self.flow += WaterSystem.FLOW_RATE
     
-
-
-
-    
-
-    
-
 if __name__=='__main__':
     main()
