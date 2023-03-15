@@ -81,9 +81,15 @@ class MotorSystem:
         self.x_motor.set_target(x_tar)
         self.y_motor.set_target(y_tar)
         self.z_motor.set_target(z_tar)
+
+    def update(self):
+        self.x_motor.update()
+        self.y_motor.update()
+        self.z_motor.update()
+
 class Motor:
     def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin, position: int=0, max_velocity: float=.1, max_acceleration: float=.05, min_pulse_width: int=3):
-        '''Initialize the motor'''
+        '''Initialize the motor. Run once at start.'''
         self.min_pulse_width = min_pulse_width # Minimum width of pulse in microseconds. Minimum for DRV8825 is 1.9us, 3 gives us some wiggle room
         self.set_position(position)
         self.set_target(position)
@@ -92,21 +98,25 @@ class Motor:
         self.set_max_acceleration(max_acceleration)
         self.previous_step_ticks = 0
         self.set_pins(step_pin, dir_pin)
-        pass
 
     def set_pins(self, step: machine.Pin, dir: machine.Pin):
-        '''Set the pins to be used for stepping the motor.'''
+        '''Set the pins to be used for stepping the motor. Call once.'''
         self.step_pin = step
         self.dir_pin = dir
 
     def update(self):
         '''Should be called every clock cycle. This function will pulse the stepper motor needed to move the target position'''
         self.update_vel()
+        self.run_speed()
 
     def update_vel(self):
         '''Is called by update(). Changes the stepper velocity at the rate of `self.max_accel`. This function makes sure that we don't accelerate or decelerate too quickly'''
-        distance_remaining = self.target - self.position
-        pass #TODO: implement functionality
+        # TODO: Update this to use a ramp function, rather than turning off/on
+        distance_to_go = self.target - self.position
+        # steps_to_stop = self.velocity**2 / (2*self.max_accel)
+        if distance_to_go == 0:
+            self.set_velocity(0)
+        
 
     def set_target(self, tar: int):
         '''Set the target position that the motor will go to in the future'''
@@ -120,7 +130,7 @@ class Motor:
         '''Set the current velocity in steps/sec'''
         self.velocity = v
         # Set the interval between steps in microseconds 
-        self.step_interval = (math.inf if v==0 else int(1_000_000 * 1/v))
+        self.step_interval = abs(math.inf if v==0 else int(1_000_000 * 1/v))
 
     def set_max_velocity(self, max_velocity: float):
         '''Set the maximum velocity. Only needs to be called once.'''
@@ -135,7 +145,7 @@ class Motor:
         current_time = time.ticks_us()
         # print(current_time)
         if time.ticks_diff(current_time, self.previous_step_ticks) >= self.step_interval:
-            self.step(False) # Todo: add functionality for reverse here
+            self.step(reverse=(self.velocity>0))
             # This equation is confusing because we need to make sure our previous
             # step is at most `step_interval` us behind the last step
             self.previous_step_ticks = \
