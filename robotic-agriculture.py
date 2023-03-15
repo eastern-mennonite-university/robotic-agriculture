@@ -39,24 +39,26 @@ zn_lim_pin = Pin(35, Pin.IN, Pin.PULL_UP)
 def main():
     print('Hello, world!')
     motor_system = MotorSystem()
+    motor_system.set_position(0, 0, 0)
 
     frequency = 50
     # Everything inside this will run forever
-    serial = machine.UART(1, 115200, tx=1, rx=3)
-    serial.init(115200)
+    # serial = machine.UART(1, 115200, tx=1, rx=3)
+    # serial.init(115200)
+    motor_system.set_target(1000, 1000, 1000)
+    at_start = True
     while True:
-        
-        if serial.any():
-            try:
-                message = serial.readline().decode('utf-8')
-                frequency = float(message.strip())
-            except:
-                frequency = 20
+        motor_system.update()
 
-            
-
-        motor_system.z_motor.set_velocity(frequency)
-        motor_system.z_motor.run_speed()
+        # if serial.any():
+        #     try:
+        #         message = serial.readline().decode('utf-8')
+        #         frequency = float(message.strip())
+        #     except:
+        #         frequency = 20
+        # motor_system.z_motor.set_velocity(frequency)
+        # motor_system.z_motor.run_speed()
+        pass
 
 class MotorSystem:
     '''Class designed to abstract away the problems with our motor set up. 
@@ -87,6 +89,9 @@ class MotorSystem:
         self.y_motor.update()
         self.z_motor.update()
 
+    def at_target(self):
+        return all([motor.at_target() for motor in [self.x_motor, self.y_motor, self.z_motor]])
+
 class Motor:
     def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin, position: int=0, max_velocity: float=.1, max_acceleration: float=.05, min_pulse_width: int=3):
         '''Initialize the motor. Run once at start.'''
@@ -114,8 +119,15 @@ class Motor:
         # TODO: Update this to use a ramp function, rather than turning off/on
         distance_to_go = self.target - self.position
         # steps_to_stop = self.velocity**2 / (2*self.max_accel)
+
+        # This basic code says to just run at maximum velocity until we hit our
+        # target position. It should be replaced.
         if distance_to_go == 0:
             self.set_velocity(0)
+        elif distance_to_go > 0:
+            self.set_velocity(self.max_vel)
+        else:
+            self.set_velocity(-self.max_vel)
         
 
     def set_target(self, tar: int):
@@ -145,7 +157,7 @@ class Motor:
         current_time = time.ticks_us()
         # print(current_time)
         if time.ticks_diff(current_time, self.previous_step_ticks) >= self.step_interval:
-            self.step(reverse=(self.velocity>0))
+            self.step(reverse=(self.velocity<0))
             # This equation is confusing because we need to make sure our previous
             # step is at most `step_interval` us behind the last step
             self.previous_step_ticks = \
@@ -163,6 +175,9 @@ class Motor:
         self.step_pin.on()
         time.sleep_us(self.min_pulse_width)
         self.step_pin.off()
+
+    def at_target(self):
+        return self.target==self.position
 
     def distance_to_steps(self, distance: float):
         '''Converts a distance in m to a number of steps. See also `steps_to_distance`. '''
