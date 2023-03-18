@@ -4,9 +4,11 @@ from machine import Pin
 
 # List of things that still need done
 # - [X~] Automated go to position with stepper motors
+#    - [X] Able to go to specified position
 #    - [ ] Ramp velocity for stepper motors
-# - [ ] Solenoid valve control
-# - [ ] Flow meter reading
+#    - [ ] Limit switches and calibration
+# - [X] Solenoid valve control
+# - [X] Flow meter reading
 # - [ ] Soil sensor readings
 # - [X] Seed dispenser control
 # - [ ] User interface
