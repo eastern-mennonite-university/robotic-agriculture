@@ -46,28 +46,30 @@ def main():
     seed_dispenser = SeedDispenser(servo_pin)
     water_system = WaterSystem(valve_pin, flow_pin)
 
-    flow_pin.irq(trigger=Pin.IRQ_RISING, handler=water_system.water_pulse) 
+    # flow_pin.irq(trigger=Pin.IRQ_RISING, handler=water_system.water_pulse) 
 
     frequency = 50
     # Everything inside this will run forever
     # serial = machine.UART(1, 115200, tx=1, rx=3)
     # serial.init(115200)
-    motor_system.set_target(1000, 1000, 1000)
+    motor_system.set_target(1000, 2000, 1000)
     at_start = True
     while True:
         motor_system.update()
         if motor_system.at_target():
-            at_start = not at_start
+            print('reached target')
             # Dispense a seed
             seed_dispenser.collect()
             time.sleep(1)
             seed_dispenser.dispense()
             time.sleep(1)
             seed_dispenser.collect()
+            time.sleep(1)
             if at_start:
                 motor_system.set_target(0, 0, 0)
             else:
-                motor_system.set_target(1000, 1000, 1000)
+                motor_system.set_target(1000, 2000, 1000)
+            at_start = not at_start
 
         # if serial.any():
         #     try:
@@ -77,7 +79,6 @@ def main():
         #         frequency = 20
         # motor_system.z_motor.set_velocity(frequency)
         # motor_system.z_motor.run_speed()
-        pass
 
 class MotorSystem:
     '''Class designed to abstract away the problems with our motor set up. 
@@ -113,7 +114,7 @@ class MotorSystem:
         return all([motor.at_target() for motor in [self.x_motor, self.y_motor, self.z_motor]])
 
 class Motor:
-    def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin, position: int=0, max_velocity: float=.1, max_acceleration: float=.05, min_pulse_width: int=3):
+    def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin, position: int=0, max_velocity: float=400, max_acceleration: float=100, min_pulse_width: int=3):
         '''Initialize the motor. Run once at start.'''
         self.min_pulse_width = min_pulse_width # Minimum width of pulse in microseconds. Minimum for DRV8825 is 1.9us, 3 gives us some wiggle room
         self.set_position(position)
@@ -174,22 +175,27 @@ class Motor:
 
     def run_speed(self):
         '''Checks the timers for the motor and does a `step()` if needed.'''
+        # print('runspeed')
         current_time = time.ticks_us()
         # print(current_time)
         if time.ticks_diff(current_time, self.previous_step_ticks) >= self.step_interval:
             self.step(reverse=(self.velocity<0))
             # This equation is confusing because we need to make sure our previous
             # step is at most `step_interval` us behind the last step
+            # self.previous_step_ticks = current_time
             self.previous_step_ticks = \
             time.ticks_add(self.previous_step_ticks, math.floor(time.ticks_diff(current_time, self.previous_step_ticks)/self.step_interval)*self.step_interval)
 
     def step(self, reverse: bool=False):
         '''Perform one step. If `reverse` is set, go the opposite way. Uses `self.min_pulse_width` to calculate length of pulse'''
         # First, set the direction pin
+        # print(self.position)
         if (reverse): 
             self.dir_pin.on()
+            self.position -= 1
         else:
             self.dir_pin.off()
+            self.position += 1
 
         # Then, pulse the desired pin as quickly as possible
         self.step_pin.on()
@@ -217,9 +223,10 @@ class SeedDispenser:
     # of the servo motor
     DISPENSE_DUTY = 27
     COLLECT_DUTY = 65
-    def __init___(self, servo_pin):
+    def __init__(self, servo_pin):
         self.pos = 0
         self.servo = machine.PWM(servo_pin, freq=50)
+        self.collect()
 
     def dispense(self):
         '''Moves servo motor to dispense position'''
