@@ -23,7 +23,7 @@ valve_pin = Pin(22, Pin.OUT)
 servo_pin = Pin(21, Pin.OUT)
 
 
-flow_pin = Pin(23, Pin.IN)
+flow_pin = Pin(23, Pin.IN, Pin.PULL_DOWN)
 moisture1_pin = Pin(34, Pin.IN)
 moisture1_pin = Pin(39, Pin.IN)
 moisture1_pin = Pin(36, Pin.IN)
@@ -46,7 +46,7 @@ def main():
     seed_dispenser = SeedDispenser(servo_pin)
     water_system = WaterSystem(valve_pin, flow_pin)
 
-    # flow_pin.irq(trigger=Pin.IRQ_RISING, handler=water_system.water_pulse) 
+    flow_pin.irq(trigger=Pin.IRQ_RISING, handler=water_system.water_pulse) 
 
     frequency = 50
     # Everything inside this will run forever
@@ -246,24 +246,31 @@ class WaterSystem:
         self.valve_pin = valve_pin
         self.flow_pin = flow_pin
         self.flow = 0
-        self.dispense_target = 0
+        self.dispense_target_ml = 0
+        self.last_pulse = time.ticks_ms()
 
     def update(self):
         '''Opens/closes valve based on what is needed'''
-        if self.flow < self.dispense_target:
+        if self.flow < self.dispense_target_ml:
             self.valve_pin.on()
         else:
             self.valve_pin.off()
             self.flow = 0
-            self.dispense_target = 0
+            self.dispense_target_ml = 0
 
-    def dispense(self, dispense_target):
+    def dispense(self, dispense_target_ml):
         '''Set the target amount of water to dispense, in mL'''
-        self.dispense_target = dispense_target
+        self.dispense_target_ml = dispense_target_ml
 
     def water_pulse(self, pin):
-        '''Called by interrupt'''
-        self.flow += WaterSystem.FLOW_RATE
+        '''Called by interrupt - increases flow by set rate'''
+        current_ticks_ms = time.ticks_ms()
+        ms_diff = time.ticks_diff(current_ticks_ms, self.last_pulse)
+        # Debounce signal (signal will never be above 400Hz)
+        if ms_diff >= 2:
+            self.flow += WaterSystem.FLOW_RATE
+            self.last_pulse = current_ticks_ms
+            # print(f'{self.flow} mL')
     
 if __name__=='__main__':
     main()
