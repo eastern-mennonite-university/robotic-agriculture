@@ -24,12 +24,13 @@ z_step_pin = Pin(18, Pin.OUT)
 valve_pin = Pin(22, Pin.OUT)
 servo_pin = Pin(21, Pin.OUT)
 
-
+# Water system pins
 flow_pin = Pin(23, Pin.IN, Pin.PULL_DOWN)
 moisture1_pin = Pin(34, Pin.IN)
 moisture1_pin = Pin(39, Pin.IN)
 moisture1_pin = Pin(36, Pin.IN)
 
+# Limit switch pins
 xp_lim_pin = Pin(4, Pin.IN, Pin.PULL_UP)
 xn_lim_pin = Pin(26, Pin.IN, Pin.PULL_UP)
 yp_lim_pin = Pin(25, Pin.IN, Pin.PULL_UP)
@@ -47,6 +48,14 @@ def main():
 
     seed_dispenser = SeedDispenser(servo_pin)
     water_system = WaterSystem(valve_pin, flow_pin)
+
+    # Set up handlers for limit switch interrupts
+    xp_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.xp_limit_hit)
+    xn_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.xn_limit_hit)
+    yp_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.yp_limit_hit)
+    yn_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.yn_limit_hit)
+    zp_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.zp_limit_hit)
+    zn_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.zn_limit_hit)
 
     flow_pin.irq(trigger=Pin.IRQ_RISING, handler=water_system.water_pulse) 
 
@@ -89,10 +98,16 @@ class MotorSystem:
     X = 0
     Y = 1
     Z = 2
+    X_MIN = 0
+    X_MAX = 1000
+    Y_MIN = 0
+    Y_MAX = 1000
+    Z_MIN = 0
+    Z_MAX = 1000
     def __init__(self):
-        self.x_motor = Motor(x1_step_pin, dir_pin)
-        self.y_motor = Motor(y_step_pin, dir_pin)
-        self.z_motor = Motor(z_step_pin, dir_pin)
+        self.x_motor = Motor(x1_step_pin, dir_pin, max_position=MotorSystem.X_MAX)
+        self.y_motor = Motor(y_step_pin, dir_pin, max_position=MotorSystem.Y_MAX)
+        self.z_motor = Motor(z_step_pin, dir_pin, max_position=MotorSystem.Z_MAX)
         pass
 
     def set_position(self, x_pos: int, y_pos: int, z_pos: int):
@@ -111,17 +126,34 @@ class MotorSystem:
         self.y_motor.update()
         self.z_motor.update()
 
+    # Handlers for limit switch interrupts
+    # Will update the positions of the motors
+    def xp_limit_hit(self, _pin):
+        self.x_motor.set_position(self.x_motor.max_position)
+    def xn_limit_hit(self, _pin):
+        self.x_motor.set_position(0)
+    def yp_limit_hit(self, _pin):
+        self.y_motor.set_position(self.y_motor.max_position)
+    def yn_limit_hit(self, _pin):
+        self.y_motor.set_position(0)
+    def zp_limit_hit(self, _pin):
+        self.z_motor.set_position(self.z_motor.max_position)
+    def zn_limit_hit(self, _pin):
+        self.z_motor.set_position(0)
+
+
     def at_target(self):
         '''Returns true if all of its motors are at the target position'''
         return all([motor.at_target() for motor in [self.x_motor, self.y_motor, self.z_motor]])
 
 class Motor:
-    def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin, position: int=0, max_velocity: float=400, max_acceleration: float=100, min_pulse_width: int=3):
+    def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin, position: int=0, max_velocity: float=400, max_acceleration: float=100, min_pulse_width: int=3, max_position: int=1000):
         '''Initialize the motor. Run once at start.'''
         self.min_pulse_width = min_pulse_width # Minimum width of pulse in microseconds. Minimum for DRV8825 is 1.9us, 3 gives us some wiggle room
         self.set_position(position)
         self.set_target(position)
         self.set_velocity(0)
+        self.max_position = max_position
         self.set_max_velocity(max_velocity)
         self.set_max_acceleration(max_acceleration)
         self.previous_step_ticks = 0
@@ -155,7 +187,7 @@ class Motor:
 
     def set_target(self, tar: int):
         '''Set the target position that the motor will go to in the future'''
-        self.target = tar
+        self.target = max(min(tar, self.max_position), 0)
 
     def set_position(self, pos: int):
         '''Set the current position of the motor. Note that this is *not* the target position'''
@@ -264,7 +296,7 @@ class WaterSystem:
         '''Set the target amount of water to dispense, in mL'''
         self.dispense_target_ml = dispense_target_ml
 
-    def water_pulse(self, pin):
+    def water_pulse(self, _pin):
         '''Called by interrupt - increases flow by set rate'''
         current_ticks_ms = time.ticks_ms()
         ms_diff = time.ticks_diff(current_ticks_ms, self.last_pulse)
