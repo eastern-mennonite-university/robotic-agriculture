@@ -54,8 +54,8 @@ def main():
     xn_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.xn_limit_hit)
     yp_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.yp_limit_hit)
     yn_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.yn_limit_hit)
-    zp_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.zp_limit_hit)
-    zn_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.zn_limit_hit)
+    # zp_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.zp_limit_hit)
+    # zn_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.zn_limit_hit)
 
     flow_pin.irq(trigger=Pin.IRQ_RISING, handler=water_system.water_pulse) 
 
@@ -67,6 +67,7 @@ def main():
     at_start = True
     while True:
         motor_system.update()
+        time.sleep(1)
         if motor_system.at_target():
             print('reached target')
             # Dispense a seed
@@ -98,6 +99,7 @@ class MotorSystem:
     X = 0
     Y = 1
     Z = 2
+    # TODO: Make these limits adjustable
     X_MIN = 0
     X_MAX = 1000
     Y_MIN = 0
@@ -128,6 +130,7 @@ class MotorSystem:
 
     # Handlers for limit switch interrupts
     # Will update the positions of the motors
+    # TODO: Maybe add more details here?
     def xp_limit_hit(self, _pin):
         self.x_motor.set_position(self.x_motor.max_position)
     def xn_limit_hit(self, _pin):
@@ -138,8 +141,12 @@ class MotorSystem:
         self.y_motor.set_position(0)
     def zp_limit_hit(self, _pin):
         self.z_motor.set_position(self.z_motor.max_position)
+        print('zp limit')
+    # TODO: This pin doesn't have an internal pullup resistor, so it
+    # doesn't work right yet
     def zn_limit_hit(self, _pin):
         self.z_motor.set_position(0)
+        print('zn limit')
 
 
     def at_target(self):
@@ -147,13 +154,13 @@ class MotorSystem:
         return all([motor.at_target() for motor in [self.x_motor, self.y_motor, self.z_motor]])
 
 class Motor:
-    def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin, position: int=0, max_velocity: float=400, max_acceleration: float=100, min_pulse_width: int=3, max_position: int=1000):
+    def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin, position: int=0, max_velocity: float=200, max_acceleration: float=100, min_pulse_width: int=3, max_position: int=1000):
         '''Initialize the motor. Run once at start.'''
+        self.max_position = max_position
         self.min_pulse_width = min_pulse_width # Minimum width of pulse in microseconds. Minimum for DRV8825 is 1.9us, 3 gives us some wiggle room
         self.set_position(position)
         self.set_target(position)
         self.set_velocity(0)
-        self.max_position = max_position
         self.set_max_velocity(max_velocity)
         self.set_max_acceleration(max_acceleration)
         self.previous_step_ticks = 0
