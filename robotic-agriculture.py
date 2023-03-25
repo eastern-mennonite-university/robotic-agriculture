@@ -313,5 +313,29 @@ class WaterSystem:
             self.last_pulse = current_ticks_ms
             # print(f'{self.flow} mL')
     
+
+class ProgramState():
+    def __init__(self):
+        pass
+
+    def run(self):
+        raise NotImplementedError
+    
+class IdleState():
+    '''State representing when the machine is doing nothing'''
+    def run(self):
+
+        time.sleep(1)
+        return self
+
+class CalibrationState():
+    pass
+
+class WateringState():
+    pass
+
+class PlantingState():
+    pass
+
 if __name__=='__main__':
     main()
