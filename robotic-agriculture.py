@@ -12,6 +12,11 @@ from machine import Pin
 # - [ ] Soil sensor readings
 # - [X] Seed dispenser control
 # - [ ] User interface
+# - [ ] Program States
+#    - [ ] Idle State
+#    - [ ] Calibration State
+#    - [ ] Watering State
+#    - [ ] Planting State
 
 
 # Define all of the pins
