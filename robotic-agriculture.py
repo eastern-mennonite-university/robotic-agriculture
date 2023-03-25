@@ -330,10 +330,9 @@ class UserInterface:
 
 class ProgramState:
     '''General class representing a state. For any subclass of ProgramState,
-    you can pass an instance of a state to create a new state. Ex:
-        ```# self = instance of WateringState \\
-        new_state = IdleState(self)```
-        '''
+    you can pass an instance of a state to create a new state. Each state has a
+    run() function that should be called on every program cycle that does whatever 
+    it is supposed to do. run() should always return a subclass of ProgramState'''
     motor_system: MotorSystem
     water_system: WaterSystem
     dispenser: SeedDispenser
@@ -353,6 +352,7 @@ class ProgramState:
             self.user_interface = UserInterface()
 
     def run(self) -> 'ProgramState':
+        '''Called every program cycle, ideally'''
         raise NotImplementedError
     
 class IdleState(ProgramState):
@@ -384,40 +384,46 @@ class CalibrationState(ProgramState):
         # Check for limit switch hits (remember, False=hit)
         if self.x_cal_dir=='positive' and xp_lim_pin.value() == False:
             self.x_cal_dir = 'negative'
+            self.motor_system.x_motor.max_position = self.motor_system.x_motor.position
         if self.y_cal_dir=='positive' and yp_lim_pin.value() == False:
             self.y_cal_dir = 'negative'
+            self.motor_system.y_motor.max_position = self.motor_system.y_motor.position
         if self.z_cal_dir=='positive' and zp_lim_pin.value() == False:
             self.z_cal_dir = 'negative'
+            self.motor_system.z_motor.max_position = self.motor_system.z_motor.position
 
         if self.x_cal_dir=='negative' and xn_lim_pin.value() == False:
             self.x_cal_dir = 'done'
+            self.motor_system.x_motor.min_position = self.motor_system.x_motor.position
         if self.y_cal_dir=='negative' and yn_lim_pin.value() == False:
             self.y_cal_dir = 'done'
+            self.motor_system.y_motor.min_position = self.motor_system.y_motor.position
         if self.z_cal_dir=='negative' and zn_lim_pin.value() == False:
             self.z_cal_dir = 'done'
+            self.motor_system.z_motor.min_position = self.motor_system.z_motor.position
 
         # Check which point we are at for each of the stepper motors, and set the
         # velocities appropriately
         # TODO: this needs to update motor_system with our bounds
         match self.x_cal_dir:
             case 'positive':
-                self.motor_system.x_motor.set_velocity(100)
+                self.motor_system.x_motor.set_velocity(self.motor_system.x_motor.max_vel)
             case 'negative':
-                self.motor_system.x_motor.set_velocity(-100)
+                self.motor_system.x_motor.set_velocity(-self.motor_system.x_motor.max_vel)
             case 'done':
                 self.motor_system.x_motor.set_velocity(0)
         match self.y_cal_dir:
             case 'positive':
-                self.motor_system.y_motor.set_velocity(100)
+                self.motor_system.y_motor.set_velocity(self.motor_system.y_motor.max_vel)
             case 'negative':
-                self.motor_system.y_motor.set_velocity(-100)
+                self.motor_system.y_motor.set_velocity(-self.motor_system.y_motor.max_vel)
             case 'done':
                 self.motor_system.y_motor.set_velocity(0)
         match self.z_cal_dir:
             case 'positive':
-                self.motor_system.z_motor.set_velocity(100)
+                self.motor_system.z_motor.set_velocity(self.motor_system.z_motor.max_vel)
             case 'negative':
-                self.motor_system.z_motor.set_velocity(-100)
+                self.motor_system.z_motor.set_velocity(-self.motor_system.z_motor.max_vel)
             case 'done':
                 self.motor_system.z_motor.set_velocity(0)
 
