@@ -258,10 +258,6 @@ class Motor:
     def steps_to_distance(self, steps: int):
         '''Converts a number of steps to distance in m. See also `steps_to_distance`. '''
         pass
-
-    def calibrate(self):
-        '''calibration subroutine - not sure how this will work'''
-        pass
         
 class SeedDispenser:
     # These denote the duty cycles of the collect and dispense positions
