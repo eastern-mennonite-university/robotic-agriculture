@@ -134,7 +134,7 @@ class MotorSystem:
 
     # Handlers for limit switch interrupts
     # Will update the positions of the motors
-    # TODO: Maybe add more details here?
+    # TODO: Maybe add more details here? Maybe move to State classes?
     def xp_limit_hit(self, _pin):
         self.x_motor.set_position(self.x_motor.max_position)
     def xn_limit_hit(self, _pin):
@@ -158,6 +158,17 @@ class MotorSystem:
         return all([motor.at_target() for motor in [self.x_motor, self.y_motor, self.z_motor]])
 
 class Motor:
+    # Type hints for attriutes
+    position: int
+    max_position: int
+    min_position: int
+    velocity: float
+    max_vel: float
+    step_interval: int
+    previous_step_ticks: int
+    min_pulse_width: int
+    step_pin: Pin
+    dir_pin: Pin
     def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin, position: int=0, max_velocity: float=200, max_acceleration: float=100, min_pulse_width: int=3, max_position: int=1000):
         '''Initialize the motor. Run once at start.'''
         self.max_position = max_position
