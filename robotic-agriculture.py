@@ -44,7 +44,6 @@ def handle_interrupt(pin):
 def main():
     print('Script started')
     motor_system = MotorSystem()
-    motor_system.set_position(0, 0, 0)
 
     seed_dispenser = SeedDispenser(servo_pin)
     water_system = WaterSystem(valve_pin, flow_pin)
@@ -110,7 +109,7 @@ class MotorSystem:
         self.x_motor = Motor(x1_step_pin, dir_pin, max_position=MotorSystem.X_MAX)
         self.y_motor = Motor(y_step_pin, dir_pin, max_position=MotorSystem.Y_MAX)
         self.z_motor = Motor(z_step_pin, dir_pin, max_position=MotorSystem.Z_MAX)
-        pass
+        self.set_position(0, 0, 0)
 
     def set_position(self, x_pos: int, y_pos: int, z_pos: int):
         '''Set positions for all of the motors at once'''
@@ -313,28 +312,130 @@ class WaterSystem:
             self.last_pulse = current_ticks_ms
             # print(f'{self.flow} mL')
     
-
-class ProgramState():
-    def __init__(self):
+class UserInterface:
+    '''Class designed to get user input. TODO: implementation'''
+    def __init__(self) -> None:
         pass
 
-    def run(self):
+    def get_input(self):
+        return None
+
+# --------------------------------------------------------------------------
+# Program States
+
+class ProgramState:
+    '''General class representing a state. For any subclass of ProgramState,
+    you can pass an instance of a state to create a new state. Ex:
+        ```# self = instance of WateringState \\
+        new_state = IdleState(self)```
+        '''
+    motor_system: MotorSystem
+    water_system: WaterSystem
+    dispenser: SeedDispenser
+    user_interface: UserInterface
+    last_calibration: float
+
+    def __init__(self, previous_state: 'ProgramState'=None):
+        if previous_state:
+            self.motor_system = previous_state.motor_system
+            self.water_system = previous_state.water_system
+            self.dispenser = previous_state.dispenser
+            self.user_interface = previous_state.user_interface
+        else:
+            self.motor_system = MotorSystem()
+            self.water_system = WaterSystem(valve_pin, flow_pin)
+            self.dispenser = SeedDispenser(servo_pin)
+            self.user_interface = UserInterface()
+
+    def run(self) -> 'ProgramState':
         raise NotImplementedError
     
-class IdleState():
+class IdleState(ProgramState):
     '''State representing when the machine is doing nothing'''
     def run(self):
+        input = self.user_interface.get_input()
+        if input is None:
+            time.sleep(1)
+            return self
+        else:
+            return WateringState(self)
 
-        time.sleep(1)
-        return self
+class CalibrationState(ProgramState):
+    x_cal_dir: str
+    y_cal_dir: str
+    z_cal_dir: str
+    min_x: int
+    min_y: int
+    min_z: int
+    max_x: int
+    max_y: int
+    max_z: int
+    def __init__(self, previous_state: 'ProgramState' = None):
+        super().__init__(previous_state)
+        self.x_cal_dir = 'positive'
+        self.y_cal_dir = 'positive'
+        self.z_cal_dir = 'positive'
+    def run(self):
+        # Check for limit switch hits (remember, False=hit)
+        if self.x_cal_dir=='positive' and xp_lim_pin.value() == False:
+            self.x_cal_dir = 'negative'
+        if self.y_cal_dir=='positive' and yp_lim_pin.value() == False:
+            self.y_cal_dir = 'negative'
+        if self.z_cal_dir=='positive' and zp_lim_pin.value() == False:
+            self.z_cal_dir = 'negative'
 
-class CalibrationState():
+        if self.x_cal_dir=='negative' and xn_lim_pin.value() == False:
+            self.x_cal_dir = 'done'
+        if self.y_cal_dir=='negative' and yn_lim_pin.value() == False:
+            self.y_cal_dir = 'done'
+        if self.z_cal_dir=='negative' and zn_lim_pin.value() == False:
+            self.z_cal_dir = 'done'
+
+        # Check which point we are at for each of the stepper motors, and set the
+        # velocities appropriately
+        # TODO: this needs to update motor_system with our bounds
+        match self.x_cal_dir:
+            case 'positive':
+                self.motor_system.x_motor.set_velocity(100)
+            case 'negative':
+                self.motor_system.x_motor.set_velocity(-100)
+            case 'done':
+                self.motor_system.x_motor.set_velocity(0)
+        match self.y_cal_dir:
+            case 'positive':
+                self.motor_system.y_motor.set_velocity(100)
+            case 'negative':
+                self.motor_system.y_motor.set_velocity(-100)
+            case 'done':
+                self.motor_system.y_motor.set_velocity(0)
+        match self.z_cal_dir:
+            case 'positive':
+                self.motor_system.z_motor.set_velocity(100)
+            case 'negative':
+                self.motor_system.z_motor.set_velocity(-100)
+            case 'done':
+                self.motor_system.z_motor.set_velocity(0)
+
+        # Once all the speeds are set, call our run_speed function.
+        # Normally we would use motor_system.update(), but this is an exception,
+        # because we need to go outside of normal behavior to calibrate
+        self.motor_system.x_motor.run_speed()
+        self.motor_system.y_motor.run_speed()
+        self.motor_system.z_motor.run_speed()
+
+        # If we are done calibrating, we need to calibrate the motors 
+        # and return an IdleState
+        if self.x_cal_dir=='done' and self.y_cal_dir=='done' and self.z_cal_dir=='done':
+            self.last_calibration = time.time()
+            return IdleState(self)
+        else:
+            return self
+
+
+class WateringState(ProgramState):
     pass
 
-class WateringState():
-    pass
-
-class PlantingState():
+class PlantingState(ProgramState):
     pass
 
 if __name__=='__main__':
