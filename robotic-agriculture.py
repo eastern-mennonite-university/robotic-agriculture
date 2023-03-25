@@ -27,8 +27,8 @@ servo_pin = Pin(21, Pin.OUT)
 # Water system pins
 flow_pin = Pin(23, Pin.IN, Pin.PULL_DOWN)
 moisture1_pin = Pin(34, Pin.IN)
-moisture1_pin = Pin(39, Pin.IN)
-moisture1_pin = Pin(36, Pin.IN)
+moisture2_pin = Pin(39, Pin.IN)
+moisture3_pin = Pin(36, Pin.IN)
 
 # Limit switch pins
 xp_lim_pin = Pin(4, Pin.IN, Pin.PULL_UP)
