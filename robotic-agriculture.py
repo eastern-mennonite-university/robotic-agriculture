@@ -42,6 +42,7 @@ yp_lim_pin = Pin(25, Pin.IN, Pin.PULL_UP)
 yn_lim_pin = Pin(33, Pin.IN, Pin.PULL_UP)
 zp_lim_pin = Pin(32, Pin.IN, Pin.PULL_UP)
 zn_lim_pin = Pin(35, Pin.IN, Pin.PULL_UP)
+limit_pins = [xp_lim_pin,xn_lim_pin,yp_lim_pin,yn_lim_pin,zp_lim_pin,zn_lim_pin]
 
 def handle_interrupt(pin):
     pass
@@ -54,47 +55,26 @@ def main():
     water_system = WaterSystem(valve_pin, flow_pin)
 
     # Set up handlers for limit switch interrupts
-    xp_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.xp_limit_hit)
-    xn_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.xn_limit_hit)
-    yp_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.yp_limit_hit)
-    yn_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.yn_limit_hit)
-    # zp_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.zp_limit_hit)
-    # zn_lim_pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.zn_limit_hit)
+    for pin in limit_pins:
+        pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.limit_handler)
 
     flow_pin.irq(trigger=Pin.IRQ_RISING, handler=water_system.water_pulse) 
 
     frequency = 50
-    # Everything inside this will run forever
-    # serial = machine.UART(1, 115200, tx=1, rx=3)
-    # serial.init(115200)
-    motor_system.set_target(1000, 2000, 1000)
-    at_start = True
-    while True:
-        motor_system.update()
-        time.sleep(1)
-        if motor_system.at_target():
-            print('reached target')
-            # Dispense a seed
-            seed_dispenser.collect()
-            time.sleep(1)
-            seed_dispenser.dispense()
-            time.sleep(1)
-            seed_dispenser.collect()
-            time.sleep(1)
-            if at_start:
-                motor_system.set_target(0, 0, 0)
-            else:
-                motor_system.set_target(1000, 2000, 1000)
-            at_start = not at_start
+    
+    # This script dispenses 100ml of water (ideally)
+    print('3...')
+    time.sleep(1)
+    print('2...')
+    time.sleep(1)
+    print('1...')
+    time.sleep(1)
+    water_system.dispense(100)
+    while water_system.update():
+        print(water_system.flow)
+        time.sleep(.333)
+    print('done')
 
-        # if serial.any():
-        #     try:
-        #         message = serial.readline().decode('utf-8')
-        #         frequency = float(message.strip())
-        #     except:
-        #         frequency = 20
-        # motor_system.z_motor.set_velocity(frequency)
-        # motor_system.z_motor.run_speed()
 
 class MotorSystem:
     '''Class designed to abstract away the problems with our motor set up. 
@@ -105,16 +85,18 @@ class MotorSystem:
     Z = 2
     # TODO: Make these limits adjustable
     X_MIN = 0
-    X_MAX = 1000
+    X_MAX = 400
     Y_MIN = 0
-    Y_MAX = 1000
+    Y_MAX = 400
     Z_MIN = 0
-    Z_MAX = 1000
+    Z_MAX = 400
+    last_lim: int
     def __init__(self):
-        self.x_motor = Motor(x1_step_pin, dir_pin, max_position=MotorSystem.X_MAX)
-        self.y_motor = Motor(y_step_pin, dir_pin, max_position=MotorSystem.Y_MAX)
-        self.z_motor = Motor(z_step_pin, dir_pin, max_position=MotorSystem.Z_MAX)
+        self.x_motor = Motor(x1_step_pin, dir_pin, max_position=MotorSystem.X_MAX, min_position=MotorSystem.X_MIN)
+        self.y_motor = Motor(y_step_pin, dir_pin, max_position=MotorSystem.Y_MAX, min_position=MotorSystem.Y_MIN)
+        self.z_motor = Motor(z_step_pin, dir_pin, max_position=MotorSystem.Z_MAX, min_position=MotorSystem.Z_MIN)
         self.set_position(0, 0, 0)
+        self.last_lim = time.ticks_us()
 
     def set_position(self, x_pos: int, y_pos: int, z_pos: int):
         '''Set positions for all of the motors at once'''
@@ -132,25 +114,28 @@ class MotorSystem:
         self.y_motor.update()
         self.z_motor.update()
 
-    # Handlers for limit switch interrupts
+    # Handler for limit switch interrupts
     # Will update the positions of the motors
     # TODO: Maybe add more details here? Maybe move to State classes?
-    def xp_limit_hit(self, _pin):
-        self.x_motor.set_position(self.x_motor.max_position)
-    def xn_limit_hit(self, _pin):
-        self.x_motor.set_position(0)
-    def yp_limit_hit(self, _pin):
-        self.y_motor.set_position(self.y_motor.max_position)
-    def yn_limit_hit(self, _pin):
-        self.y_motor.set_position(0)
-    def zp_limit_hit(self, _pin):
-        self.z_motor.set_position(self.z_motor.max_position)
-        print('zp limit')
-    # TODO: This pin doesn't have an internal pullup resistor, so it
-    # doesn't work right yet
-    def zn_limit_hit(self, _pin):
-        self.z_motor.set_position(0)
-        print('zn limit')
+
+    def limit_handler(self, pin):
+        curr_time = time.ticks_us()
+        # Debounce the switch
+        if time.ticks_diff(curr_time, self.last_lim)>100_000:
+            print(str(pin))
+            if str(pin)==str(xp_lim_pin):
+                self.x_motor.set_position(self.x_motor.max_position)
+            elif str(pin)==str(xn_lim_pin):
+                self.x_motor.set_position(self.x_motor.min_position)
+            elif str(pin)==str(yp_lim_pin):
+                self.y_motor.set_position(self.y_motor.max_position)
+            elif str(pin)==str(yn_lim_pin):
+                self.x_motor.set_position(self.x_motor.min_position)
+            elif str(pin)==str(zp_lim_pin):
+                self.z_motor.set_position(self.z_motor.max_position)
+            elif str(pin)==str(zn_lim_pin):
+                self.z_motor.set_position(self.z_motor.min_position)
+        self.last_lim = curr_time
 
 
     def at_target(self):
@@ -169,9 +154,10 @@ class Motor:
     min_pulse_width: int
     step_pin: Pin
     dir_pin: Pin
-    def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin, position: int=0, max_velocity: float=200, max_acceleration: float=100, min_pulse_width: int=3, max_position: int=1000):
+    def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin, position: int=0, max_velocity: float=200, max_acceleration: float=100, min_pulse_width: int=3, max_position: int=100, min_position: int=0):
         '''Initialize the motor. Run once at start.'''
         self.max_position = max_position
+        self.min_position = min_position
         self.min_pulse_width = min_pulse_width # Minimum width of pulse in microseconds. Minimum for DRV8825 is 1.9us, 3 gives us some wiggle room
         self.set_position(position)
         self.set_target(position)
@@ -302,13 +288,16 @@ class WaterSystem:
         self.last_pulse = time.ticks_ms()
 
     def update(self):
-        '''Opens/closes valve based on what is needed'''
+        '''Opens/closes valve based on what is needed. Returns True if it is
+        open, False if it is now closed'''
         if self.flow < self.dispense_target_ml:
             self.valve_pin.on()
+            return True
         else:
             self.valve_pin.off()
             self.flow = 0
             self.dispense_target_ml = 0
+            return False
 
     def dispense(self, dispense_target_ml):
         '''Set the target amount of water to dispense, in mL'''
@@ -412,27 +401,24 @@ class CalibrationState(ProgramState):
         # Check which point we are at for each of the stepper motors, and set the
         # velocities appropriately
         # TODO: this needs to update motor_system with our bounds
-        match self.x_cal_dir:
-            case 'positive':
-                self.motor_system.x_motor.set_velocity(self.motor_system.x_motor.max_vel)
-            case 'negative':
-                self.motor_system.x_motor.set_velocity(-self.motor_system.x_motor.max_vel)
-            case 'done':
-                self.motor_system.x_motor.set_velocity(0)
-        match self.y_cal_dir:
-            case 'positive':
-                self.motor_system.y_motor.set_velocity(self.motor_system.y_motor.max_vel)
-            case 'negative':
-                self.motor_system.y_motor.set_velocity(-self.motor_system.y_motor.max_vel)
-            case 'done':
-                self.motor_system.y_motor.set_velocity(0)
-        match self.z_cal_dir:
-            case 'positive':
-                self.motor_system.z_motor.set_velocity(self.motor_system.z_motor.max_vel)
-            case 'negative':
-                self.motor_system.z_motor.set_velocity(-self.motor_system.z_motor.max_vel)
-            case 'done':
-                self.motor_system.z_motor.set_velocity(0)
+        if self.x_cal_dir == 'positive':
+            self.motor_system.x_motor.set_velocity(self.motor_system.x_motor.max_vel)
+        elif self.x_cal_dir == 'negative':
+            self.motor_system.x_motor.set_velocity(-self.motor_system.x_motor.max_vel)
+        elif self.x_cal_dir == 'done':
+            self.motor_system.x_motor.set_velocity(0)
+        if self.y_cal_dir == 'positive':
+            self.motor_system.y_motor.set_velocity(self.motor_system.y_motor.max_vel)
+        elif self.y_cal_dir == 'negative':
+            self.motor_system.y_motor.set_velocity(-self.motor_system.y_motor.max_vel)
+        elif self.y_cal_dir == 'done':
+            self.motor_system.y_motor.set_velocity(0)
+        if self.z_cal_dir == 'positive':
+            self.motor_system.z_motor.set_velocity(self.motor_system.z_motor.max_vel)
+        elif self.z_cal_dir == 'negative':
+            self.motor_system.z_motor.set_velocity(-self.motor_system.z_motor.max_vel)
+        elif self.z_cal_dir == 'done':
+            self.motor_system.z_motor.set_velocity(0)
 
         # Once all the speeds are set, call our run_speed function.
         # Normally we would use motor_system.update(), but this is an exception,

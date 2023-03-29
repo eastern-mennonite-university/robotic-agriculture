@@ -24,7 +24,7 @@ ampy --help
 
 When I want to just run the file, I (Caleb) run this on the command line:
 ```
-ampy --port COM10 run robotic-agriculture.py
+ampy --port COM10 run -n robotic-agriculture.py
 ```
 You may need to replace `COM10` with whatever port the ESP32 shows up as on your computer
 
