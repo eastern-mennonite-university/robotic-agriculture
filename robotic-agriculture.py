@@ -47,6 +47,8 @@ limit_pins = [xp_lim_pin,xn_lim_pin,yp_lim_pin,yn_lim_pin,zp_lim_pin,zn_lim_pin]
 def handle_interrupt(pin):
     pass
 
+
+uart = machine.UART(1, 115200, tx=1, rx=3)
 def main():
     print('Script started')
     motor_system = MotorSystem()
@@ -62,7 +64,6 @@ def main():
 
     frequency = 50
     # uart = machine.UART(0, 115200)
-    uart = machine.UART(1, 115200, tx=1, rx=3)
     uart.init(115200)
 
 
@@ -90,6 +91,7 @@ def main():
                 uart.write('starting watering routine \n')
 
         current_state.run()
+        water_system.update()
 
 
 class MotorSystem:
@@ -271,7 +273,29 @@ class Motor:
     def steps_to_distance(self, steps: int):
         '''Converts a number of steps to distance in m. See also `steps_to_distance`. '''
         pass
-        
+
+class DoubleMotor(Motor):
+    def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin, position: int = 0, max_velocity: float = 200, max_acceleration: float = 100, min_pulse_width: int = 3, max_position: int = 100, min_position: int = 0):
+        super().__init__(step_pin, dir_pin, position, max_velocity, max_acceleration, min_pulse_width, max_position, min_position)
+
+    def set_pin_two(self, step_pin_2):
+        self.step_pin_2 = step_pin_2
+
+    def step(self, reverse: bool = False):
+        if (reverse): 
+            self.dir_pin.on()
+            self.position -= 1
+        else:
+            self.dir_pin.off()
+            self.position += 1
+
+        # Then, pulse the desired pin as quickly as possible
+        self.step_pin.on()
+        self.step_pin_2.on()
+        time.sleep_us(self.min_pulse_width)
+        self.step_pin.off() 
+        self.step_pin_2.off()
+    
 class SeedDispenser:
     # These denote the duty cycles of the collect and dispense positions
     # of the servo motor
@@ -327,7 +351,7 @@ class WaterSystem:
         if ms_diff >= 2:
             self.flow += WaterSystem.FLOW_RATE
             self.last_pulse = current_ticks_ms
-            # print(f'{self.flow} mL')
+            uart.write(str(self.flow))
     
 class UserInterface:
     '''Class designed to get user input. TODO: implementation'''

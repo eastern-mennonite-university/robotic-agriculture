@@ -5,9 +5,11 @@ ser = serial.Serial('COM10', 115200)
 
 pygame.init()
 
-WINDOW_SIZE = (400, 400)
+WINDOW_SIZE = (800, 600)
 screen = pygame.display.set_mode(WINDOW_SIZE)
 pygame.display.set_caption('Click Window')
+bg = pygame.image.load("controls.png")
+screen.blit(bg, (0, 0))
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -20,3 +22,4 @@ while True:
             ser.write(bytes(pygame.key.name(event.key) + ' up', 'utf-8'))
     while ser.in_waiting:
         print(ser.readline().decode().strip())
+    pygame.display.update()
