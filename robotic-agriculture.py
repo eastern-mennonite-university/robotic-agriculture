@@ -61,19 +61,35 @@ def main():
     flow_pin.irq(trigger=Pin.IRQ_RISING, handler=water_system.water_pulse) 
 
     frequency = 50
-    
-    # This script dispenses 100ml of water (ideally)
-    print('3...')
-    time.sleep(1)
-    print('2...')
-    time.sleep(1)
-    print('1...')
-    time.sleep(1)
-    water_system.dispense(100)
-    while water_system.update():
-        print(water_system.flow)
-        time.sleep(.333)
-    print('done')
+    # uart = machine.UART(0, 115200)
+    uart = machine.UART(1, 115200, tx=1, rx=3)
+    uart.init(115200)
+
+
+    current_state = IdleState()
+    while True:
+        if uart.any():
+            cmd = uart.readline().decode('utf-8').strip()
+            # uart.write('received command: '+cmd+'\n')
+            if cmd == 'p down':
+                water_system.dispense(100)
+            elif cmd == 'p up':
+                water_system.dispense(0)
+            elif cmd == 'f down':
+                seed_dispenser.dispense()
+            elif cmd == 'f up':
+                seed_dispenser.collect()
+            elif cmd == 'c down':
+                current_state = CalibrationState(current_state)
+                uart.write('starting calibration \n')
+            elif cmd == 'i down':
+                current_state = IdleState(current_state)
+                uart.write('switched to idle \n')
+            elif cmd == 'h down':
+                current_state = WateringState(current_state)
+                uart.write('starting watering routine \n')
+
+        current_state.run()
 
 
 class MotorSystem:
@@ -98,16 +114,16 @@ class MotorSystem:
         self.set_position(0, 0, 0)
         self.last_lim = time.ticks_us()
 
-    def set_position(self, x_pos: int, y_pos: int, z_pos: int):
+    def set_position(self, x_pos: int=None, y_pos: int=None, z_pos: int=None):
         '''Set positions for all of the motors at once'''
-        self.x_motor.set_position(x_pos)
-        self.y_motor.set_position(y_pos)
-        self.z_motor.set_position(z_pos)
+        if x_pos is not None: self.x_motor.set_position(x_pos)
+        if y_pos is not None: self.y_motor.set_position(y_pos)
+        if z_pos is not None: self.z_motor.set_position(z_pos)
 
-    def set_target(self, x_tar: int, y_tar: int, z_tar: int):
-        self.x_motor.set_target(x_tar)
-        self.y_motor.set_target(y_tar)
-        self.z_motor.set_target(z_tar)
+    def set_target(self, x_tar: int=None, y_tar: int=None, z_tar: int=None):
+        if x_tar is not None: self.x_motor.set_target(x_tar)
+        if y_tar is not None: self.y_motor.set_target(y_tar)
+        if z_tar is not None: self.z_motor.set_target(z_tar)
 
     def update(self):
         self.x_motor.update()
@@ -260,7 +276,7 @@ class SeedDispenser:
     # These denote the duty cycles of the collect and dispense positions
     # of the servo motor
     DISPENSE_DUTY = 27
-    COLLECT_DUTY = 65
+    COLLECT_DUTY = 66
     def __init__(self, servo_pin):
         self.pos = 0
         self.servo = machine.PWM(servo_pin, freq=50)
@@ -346,7 +362,6 @@ class ProgramState:
             self.water_system = WaterSystem(valve_pin, flow_pin)
             self.dispenser = SeedDispenser(servo_pin)
             self.user_interface = UserInterface()
-
     def run(self) -> 'ProgramState':
         '''Called every program cycle, ideally'''
         raise NotImplementedError
@@ -354,12 +369,7 @@ class ProgramState:
 class IdleState(ProgramState):
     '''State representing when the machine is doing nothing'''
     def run(self):
-        input = self.user_interface.get_input()
-        if input is None:
-            time.sleep(1)
-            return self
-        else:
-            return WateringState(self)
+        pass
 
 class CalibrationState(ProgramState):
     x_cal_dir: str
@@ -437,10 +447,12 @@ class CalibrationState(ProgramState):
 
 
 class WateringState(ProgramState):
-    pass
+    def run(self):
+        return self
 
 class PlantingState(ProgramState):
-    pass
+    def run(self):
+        return self
 
 if __name__=='__main__':
     main()

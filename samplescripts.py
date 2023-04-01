@@ -33,3 +33,17 @@ while True:
         #         frequency = 20
         # motor_system.z_motor.set_velocity(frequency)
         # motor_system.z_motor.run_speed()
+
+
+# This script dispenses 100ml of water (ideally)
+    print('3...')
+    time.sleep(1)
+    print('2...')
+    time.sleep(1)
+    print('1...')
+    time.sleep(1)
+    water_system.dispense(100)
+    while water_system.update():
+        print(water_system.flow)
+        time.sleep(.333)
+    print('done')
