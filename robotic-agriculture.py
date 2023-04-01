@@ -110,7 +110,7 @@ class MotorSystem:
     Z_MAX = 400
     last_lim: int
     def __init__(self):
-        self.x_motor = Motor(x1_step_pin, dir_pin, max_position=MotorSystem.X_MAX, min_position=MotorSystem.X_MIN)
+        self.x_motor = DoubleMotor(x1_step_pin, x2_step_pin, dir_pin, max_position=MotorSystem.X_MAX, min_position=MotorSystem.X_MIN)
         self.y_motor = Motor(y_step_pin, dir_pin, max_position=MotorSystem.Y_MAX, min_position=MotorSystem.Y_MIN)
         self.z_motor = Motor(z_step_pin, dir_pin, max_position=MotorSystem.Z_MAX, min_position=MotorSystem.Z_MIN)
         self.set_position(0, 0, 0)
@@ -275,10 +275,8 @@ class Motor:
         pass
 
 class DoubleMotor(Motor):
-    def __init__(self, step_pin: machine.Pin, dir_pin: machine.Pin, position: int = 0, max_velocity: float = 200, max_acceleration: float = 100, min_pulse_width: int = 3, max_position: int = 100, min_position: int = 0):
+    def __init__(self, step_pin: machine.Pin, step_pin_2: machine.Pin, dir_pin: machine.Pin, position: int = 0, max_velocity: float = 200, max_acceleration: float = 100, min_pulse_width: int = 3, max_position: int = 100, min_position: int = 0):
         super().__init__(step_pin, dir_pin, position, max_velocity, max_acceleration, min_pulse_width, max_position, min_position)
-
-    def set_pin_two(self, step_pin_2):
         self.step_pin_2 = step_pin_2
 
     def step(self, reverse: bool = False):
@@ -348,10 +346,10 @@ class WaterSystem:
         current_ticks_ms = time.ticks_ms()
         ms_diff = time.ticks_diff(current_ticks_ms, self.last_pulse)
         # Debounce signal (signal will never be above 400Hz)
-        if ms_diff >= 2:
+        if ms_diff >= 0.001:
             self.flow += WaterSystem.FLOW_RATE
             self.last_pulse = current_ticks_ms
-            uart.write(str(self.flow))
+        uart.write(str(self.flow) + '\n')
     
 class UserInterface:
     '''Class designed to get user input. TODO: implementation'''
@@ -471,8 +469,29 @@ class CalibrationState(ProgramState):
 
 
 class WateringState(ProgramState):
+    def __init__(self, previous_state: 'ProgramState' = None):
+        super().__init__(previous_state)
+        self.sub_state = 'positioning'
+        # TODO: Figure out ml per step.
+        self.ml_per_step = 10
     def run(self):
-        return self
+        # Position the gantry at the starting position
+        if self.sub_state == 'positioning':
+            self.motor_system.set_target(self.motor_system.x_motor.min_position+10, None, None)
+            self.motor_system.update()
+            if self.motor_system.at_target():
+                self.sub_state == 'watering'
+                uart.write('(watering) done positioning, now watering \n')
+        # Run the actual watering process
+        if self.sub_state == 'watering':
+            self.water_system.dispense(self.ml_per_step * (self.motor_system.x_motor.max_position-self.motor_system.x_motor.max_position))
+            self.water_system.update()
+            # Our target x position should be f/r, where f is the total flow in
+            # mL, and r is the number of mL per step
+
+
+
+
 
 class PlantingState(ProgramState):
     def run(self):
