@@ -52,8 +52,8 @@ uart = machine.UART(1, 115200, tx=1, rx=3)
 def main():
     print('Script started')
 
-    ps = PlantingState()
-    print(ps.generate_seed_coords(10, 10))
+    # ps = PlantingState()
+    # print(ps.generate_seed_coords(10, 10))
 
     motor_system = MotorSystem()
 
@@ -84,15 +84,18 @@ def main():
                 seed_dispenser.dispense()
             elif cmd == 'f up':
                 seed_dispenser.collect()
-            elif cmd == 'c down':
-                current_state = CalibrationState(current_state)
-                uart.write('starting calibration \n')
-            elif cmd == 'i down':
+            elif cmd == '1 down':
                 current_state = IdleState(current_state)
                 uart.write('switched to idle \n')
-            elif cmd == 'h down':
+            elif cmd == '2 down':
+                current_state = CalibrationState(current_state)
+                uart.write('starting calibration \n')
+            elif cmd == '3 down':
                 current_state = WateringState(current_state)
                 uart.write('starting watering routine \n')
+            elif cmd == '4 down':
+                current_state = PlantingState(current_state)
+                uart.write('starting planting routine \n')
 
         current_state.run()
         water_system.update()
@@ -217,7 +220,7 @@ class Motor:
 
     def set_target(self, tar: int):
         '''Set the target position that the motor will go to in the future'''
-        self.target = max(min(tar, self.max_position), 0)
+        self.target = max(min(tar, self.max_position), self.min_position)
 
     def set_position(self, pos: int):
         '''Set the current position of the motor. Note that this is *not* the target position'''
