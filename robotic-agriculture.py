@@ -51,6 +51,10 @@ def handle_interrupt(pin):
 uart = machine.UART(1, 115200, tx=1, rx=3)
 def main():
     print('Script started')
+
+    ps = PlantingState()
+    print(ps.generate_seed_coords(10, 10))
+
     motor_system = MotorSystem()
 
     seed_dispenser = SeedDispenser(servo_pin)
@@ -494,8 +498,69 @@ class WateringState(ProgramState):
 
 
 class PlantingState(ProgramState):
+    def __init__(self, previous_state: 'ProgramState' = None, nx=0, ny=0):
+        super().__init__(previous_state)
+        self.current_seed_index = 0
+        self.sub_state = 'up'
+        self.generate_seed_coords(nx, ny)
+
+    def generate_seed_coords(self, nx: int, ny: int, min_steps_between=0):
+        min_length = nx*min_steps_between
+        min_width = ny*min_steps_between
+        x_range = (self.motor_system.x_motor.max_position-self.motor_system.x_motor.min_positoin)
+        y_range = (self.motor_system.y_motor.max_position-self.motor_system.y_motor.min_positoin)
+        if min_length > x_range:
+            uart.write('too long!')
+            self.seeds = []
+        elif min_width > y_range:
+            uart.write('too wide!')
+            self.seeds = []
+        else:
+            seeds = []
+            for x in range(nx):
+                for y in range(ny):
+                    x_pos = self.motor_system.x_motor.min_position + round((x+.5)*(x_range/nx))
+                    y_pos = self.motor_system.x_motor.min_position + round((y+.5)*(y_range/ny))
+                    seeds.append((x_pos, y_pos))
+            self.seeds = seeds
+        return seeds
+
+
     def run(self):
+        # Check to see if we are at the end of the list of seeds
+        if self.current_seed_index >= len(self.seeds):
+            return IdleState(self)
+        # 'up' is for raising the planter up to maximum height
+        if self.sub_state == 'up':
+            self.motor_system.set_target(None, None, self.motor_system.z_motor.max_position)
+            self.motor_system.update()
+            if self.motor_system.at_target():
+                self.sub_state = 'move'
+        # 'move' is for moving to the next seed location
+        elif self.sub_state == 'move':
+            self.motor_system.set_target(*(self.seeds[self.current_seed_index]), None)
+            self.motor_system.update()
+            if self.motor_system.at_target():
+                self.sub_state = 'down'
+        # 'down' is for moving down to plant the seed
+        elif self.sub_state == 'down':
+            self.motor_system.set_target(None, None, self.motor_system.z_motor.min_position)
+            self.motor_system.update()
+            if self.motor_system.at_target():
+                self.sub_state = 'plant'
+        # 'plant' is for actually dispensing the seed
+        elif self.sub_state == 'plant':
+            self.dispenser.collect()
+            time.sleep(1)
+            self.dispenser.dispense()
+            time.sleep(1)
+            self.dispenser.collect()
+            time.sleep(1)
+            self.current_seed_index += 1
+            self.sub_state = 'up'
         return self
+
+
 
 if __name__=='__main__':
     main()
