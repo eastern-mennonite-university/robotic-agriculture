@@ -511,6 +511,7 @@ class WateringState(ProgramState):
                 self.user_interface.output('(watering) done positioning, now watering \n')
         # Run the actual watering process
         if self.sub_state == 'watering':
+            # TODO: This needs worked out
             self.water_system.dispense(self.ml_per_step * (self.motor_system.x_motor.max_position-self.motor_system.x_motor.max_position))
             self.water_system.update()
             # Our target x position should be f/r, where f is the total flow in
@@ -550,15 +551,16 @@ class PlantingState(ProgramState):
 
 
     def run(self):
-        # Check to see if we are at the end of the list of seeds
-        if self.current_seed_index >= len(self.seeds):
-            return IdleState(self)
         # 'up' is for raising the planter up to maximum height
+        # Do this before index check so we move up after planting last one
         if self.sub_state == 'up':
             self.motor_system.set_target(None, None, self.motor_system.z_motor.max_position)
             self.motor_system.update()
             if self.motor_system.at_target():
                 self.sub_state = 'move'
+        # Check to see if we are at the end of the list of seeds
+        elif self.current_seed_index >= len(self.seeds):
+            return IdleState(self)
         # 'move' is for moving to the next seed location
         elif self.sub_state == 'move':
             self.motor_system.set_target(*(self.seeds[self.current_seed_index]), None)
@@ -582,8 +584,6 @@ class PlantingState(ProgramState):
             self.current_seed_index += 1
             self.sub_state = 'up'
         return self
-
-
 
 if __name__=='__main__':
     main()
