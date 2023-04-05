@@ -73,9 +73,8 @@ def main():
 
     current_state = IdleState()
     while True:
-        if uart.any():
-            cmd = uart.readline().decode('utf-8').strip()
-            # uart.write('received command: '+cmd+'\n')
+        cmd = current_state.user_interface.get_input_line()
+        if cmd is not None:
             if cmd == 'p down':
                 water_system.dispense(100)
             elif cmd == 'p up':
@@ -86,16 +85,16 @@ def main():
                 seed_dispenser.collect()
             elif cmd == '1 down':
                 current_state = IdleState(current_state)
-                uart.write('switched to idle \n')
+                current_state.user_interface.output('switched to idle \n')
             elif cmd == '2 down':
                 current_state = CalibrationState(current_state)
-                uart.write('starting calibration \n')
+                current_state.user_interface.output('starting calibration \n')
             elif cmd == '3 down':
                 current_state = WateringState(current_state)
-                uart.write('starting watering routine \n')
+                current_state.user_interface.output('starting watering routine \n')
             elif cmd == '4 down':
                 current_state = PlantingState(current_state)
-                uart.write('starting planting routine \n')
+                current_state.user_interface.output('starting planting routine \n')
 
         current_state.run()
         water_system.update()
@@ -374,15 +373,24 @@ class WaterSystem:
         if ms_diff >= 0.001:
             self.flow += WaterSystem.FLOW_RATE
             self.last_pulse = current_ticks_ms
-        uart.write(str(self.flow) + '\n')
+        # current_state.user_interface.output(str(self.flow) + '\n')
     
 class UserInterface:
     '''Class designed to get user input. TODO: implementation'''
     def __init__(self) -> None:
+        self.uart = machine.UART(1, 115200, tx=1, rx=3)
+        self.uart.init()
         pass
 
-    def get_input(self):
+    def get_input_line(self):
+        if self.uart.any():
+            cmd = self.uart.readline().decode('utf-8').strip()
+            return cmd
         return None
+    
+    def output(self, out_string):
+        self.uart.write(out_string.strip() + '\n')
+
 
 # --------------------------------------------------------------------------
 # Program States
@@ -489,9 +497,9 @@ class CalibrationState(ProgramState):
         if self.x_cal_dir=='done' and self.y_cal_dir=='done' and self.z_cal_dir=='done':
             self.last_calibration = time.time()
             self.motor_system.normalize_positions()
-            uart.write(f'X: {self.motor_system.x_motor.min_position}, {self.motor_system.x_motor.max_position}')
-            uart.write(f'Y: {self.motor_system.y_motor.min_position}, {self.motor_system.y_motor.max_position}')
-            uart.write(f'Z: {self.motor_system.z_motor.min_position}, {self.motor_system.z_motor.max_position}')
+            self.user_interface.output(f'X: {self.motor_system.x_motor.min_position}, {self.motor_system.x_motor.max_position}')
+            self.user_interface.output(f'Y: {self.motor_system.y_motor.min_position}, {self.motor_system.y_motor.max_position}')
+            self.user_interface.output(f'Z: {self.motor_system.z_motor.min_position}, {self.motor_system.z_motor.max_position}')
             return IdleState(self)
         else:
             return self
@@ -510,7 +518,7 @@ class WateringState(ProgramState):
             self.motor_system.update()
             if self.motor_system.at_target():
                 self.sub_state == 'watering'
-                uart.write('(watering) done positioning, now watering \n')
+                self.user_interface.output('(watering) done positioning, now watering \n')
         # Run the actual watering process
         if self.sub_state == 'watering':
             self.water_system.dispense(self.ml_per_step * (self.motor_system.x_motor.max_position-self.motor_system.x_motor.max_position))
@@ -535,10 +543,10 @@ class PlantingState(ProgramState):
         x_range = (self.motor_system.x_motor.max_position-self.motor_system.x_motor.min_positoin)
         y_range = (self.motor_system.y_motor.max_position-self.motor_system.y_motor.min_positoin)
         if min_length > x_range:
-            uart.write('too long!')
+            self.user_interface.output('too long!')
             self.seeds = []
         elif min_width > y_range:
-            uart.write('too wide!')
+            self.user_interface.output('too wide!')
             self.seeds = []
         else:
             seeds = []
