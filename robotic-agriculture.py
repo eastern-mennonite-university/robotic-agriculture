@@ -132,11 +132,9 @@ class MotorSystem:
 
     # Handler for limit switch interrupts
     # Will update the positions of the motors
-    # TODO: Maybe add more details here? Maybe move to State classes?
-
     def limit_handler(self, pin):
         curr_time = time.ticks_us()
-        # Debounce the switch
+        # Debounce the switch, and make sure we aren't calibrating right now
         if time.ticks_diff(curr_time, self.last_lim)>100_000 and not isinstance(current_state, CalibrationState):
             print(str(pin))
             if str(pin)==str(xp_lim_pin):
@@ -369,7 +367,7 @@ class WaterSystem:
         current_state.user_interface.output(str(self.flow) + '\n')
     
 class UserInterface:
-    '''Class designed to get user input. TODO: implementation'''
+    '''Class designed to get user input.'''
     def __init__(self) -> None:
         self.uart = machine.UART(1, 115200, tx=1, rx=3)
         self.uart.init()
@@ -458,7 +456,6 @@ class CalibrationState(ProgramState):
 
         # Check which point we are at for each of the stepper motors, and set the
         # velocities appropriately
-        # TODO: this needs to update motor_system with our bounds
         if self.x_cal_dir == 'positive':
             self.motor_system.x_motor.set_velocity(self.motor_system.x_motor.max_vel)
         elif self.x_cal_dir == 'negative':
