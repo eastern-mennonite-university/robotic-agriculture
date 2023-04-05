@@ -47,9 +47,10 @@ limit_pins = [xp_lim_pin,xn_lim_pin,yp_lim_pin,yn_lim_pin,zp_lim_pin,zn_lim_pin]
 def handle_interrupt(pin):
     pass
 
-
+current_state = None
 uart = machine.UART(1, 115200, tx=1, rx=3)
 def main():
+    global current_state
     print('Script started')
 
     # ps = PlantingState()
@@ -104,16 +105,17 @@ class MotorSystem:
     '''Class designed to abstract away the problems with our motor set up. 
     
     The most important functions here are `set_target()` and `update()`. These functions set the target position for the head, and move the motors towards that target position, respectively'''
+    global current_state
     X = 0
     Y = 1
     Z = 2
     # TODO: Make these limits adjustable
     X_MIN = 0
-    X_MAX = 400
+    X_MAX = 4000000
     Y_MIN = 0
-    Y_MAX = 400
+    Y_MAX = 4000000
     Z_MIN = 0
-    Z_MAX = 400
+    Z_MAX = 4000000
     last_lim: int
     def __init__(self):
         self.x_motor = DoubleMotor(x1_step_pin, x2_step_pin, dir_pin, max_position=MotorSystem.X_MAX, min_position=MotorSystem.X_MIN)
@@ -145,7 +147,7 @@ class MotorSystem:
     def limit_handler(self, pin):
         curr_time = time.ticks_us()
         # Debounce the switch
-        if time.ticks_diff(curr_time, self.last_lim)>100_000:
+        if time.ticks_diff(curr_time, self.last_lim)>100_000 and not isinstance(current_state, CalibrationState):
             print(str(pin))
             if str(pin)==str(xp_lim_pin):
                 self.x_motor.set_position(self.x_motor.max_position)
@@ -341,6 +343,7 @@ class WaterSystem:
     # From flow meter datasheet: f(requency) = 11*Q, where Q=L/min
     # So ratio is 660 pulses/Liter
     # or 1.515 mL per pulse
+    global current_state
     FLOW_RATE = 1.515
     def __init__(self, valve_pin, flow_pin):
         self.valve_pin = valve_pin
@@ -373,7 +376,7 @@ class WaterSystem:
         if ms_diff >= 0.001:
             self.flow += WaterSystem.FLOW_RATE
             self.last_pulse = current_ticks_ms
-        # current_state.user_interface.output(str(self.flow) + '\n')
+        current_state.user_interface.output(str(self.flow) + '\n')
     
 class UserInterface:
     '''Class designed to get user input. TODO: implementation'''
