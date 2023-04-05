@@ -5,7 +5,7 @@ ser = serial.Serial('COM10', 115200)
 
 pygame.init()
 
-WINDOW_SIZE = (1000, 700)
+WINDOW_SIZE = (1000, 800)
 screen = pygame.display.set_mode(WINDOW_SIZE)
 pygame.display.set_caption('Click Window')
 bg = pygame.image.load("controls.png")

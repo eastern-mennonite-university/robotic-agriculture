@@ -6,15 +6,15 @@ from machine import Pin
 # - [X~] Automated go to position with stepper motors
 #    - [X] Able to go to specified position
 #    - [ ] Ramp velocity for stepper motors
-#    - [ ] Limit switches and calibration
+#    - [X] Limit switches and calibration
 # - [X] Solenoid valve control
 # - [X] Flow meter reading
 # - [ ] Soil sensor readings
 # - [X] Seed dispenser control
-# - [ ] User interface
+# - [X] User interface
 # - [ ] Program States
-#    - [ ] Idle State
-#    - [ ] Calibration State
+#    - [X] Idle State
+#    - [X] Calibration State
 #    - [ ] Watering State
 #    - [ ] Planting State
 
@@ -162,10 +162,17 @@ class MotorSystem:
                 self.z_motor.set_position(self.z_motor.min_position)
         self.last_lim = curr_time
 
-
     def at_target(self):
         '''Returns true if all of its motors are at the target position'''
         return all([motor.at_target() for motor in [self.x_motor, self.y_motor, self.z_motor]])
+
+    def normalize_positions(self):
+        '''Normalize the positions of all the motors. Only really needs to be
+        called after calibration.'''
+        self.x_motor.normalize_position()
+        self.y_motor.normalize_position()
+        self.z_motor.normalize_position()
+
 
 class Motor:
     # Type hints for attriutes
@@ -280,6 +287,17 @@ class Motor:
     def steps_to_distance(self, steps: int):
         '''Converts a number of steps to distance in m. See also `steps_to_distance`. '''
         pass
+
+    def normalize_position(self):
+        '''Makes it so that min_position is zero, and adjusts the current 
+        position accordingly'''
+        lower = self.min_position
+        higher = self.max_position
+        width = higher-lower
+        pos = self.position
+        self.min_position = 0
+        self.max_position = width
+        self.set_position(pos-lower)
 
 class DoubleMotor(Motor):
     def __init__(self, step_pin: machine.Pin, step_pin_2: machine.Pin, dir_pin: machine.Pin, position: int = 0, max_velocity: float = 200, max_acceleration: float = 100, min_pulse_width: int = 3, max_position: int = 100, min_position: int = 0):
@@ -470,6 +488,10 @@ class CalibrationState(ProgramState):
         # and return an IdleState
         if self.x_cal_dir=='done' and self.y_cal_dir=='done' and self.z_cal_dir=='done':
             self.last_calibration = time.time()
+            self.motor_system.normalize_positions()
+            uart.write(f'X: {self.motor_system.x_motor.min_position}, {self.motor_system.x_motor.max_position}')
+            uart.write(f'Y: {self.motor_system.y_motor.min_position}, {self.motor_system.y_motor.max_position}')
+            uart.write(f'Z: {self.motor_system.z_motor.min_position}, {self.motor_system.z_motor.max_position}')
             return IdleState(self)
         else:
             return self
