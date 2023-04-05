@@ -106,21 +106,11 @@ class MotorSystem:
     
     The most important functions here are `set_target()` and `update()`. These functions set the target position for the head, and move the motors towards that target position, respectively'''
     global current_state
-    X = 0
-    Y = 1
-    Z = 2
-    # TODO: Make these limits adjustable
-    X_MIN = 0
-    X_MAX = 4000000
-    Y_MIN = 0
-    Y_MAX = 4000000
-    Z_MIN = 0
-    Z_MAX = 4000000
     last_lim: int
     def __init__(self):
-        self.x_motor = DoubleMotor(x1_step_pin, x2_step_pin, dir_pin, max_position=MotorSystem.X_MAX, min_position=MotorSystem.X_MIN)
-        self.y_motor = Motor(y_step_pin, dir_pin, max_position=MotorSystem.Y_MAX, min_position=MotorSystem.Y_MIN)
-        self.z_motor = Motor(z_step_pin, dir_pin, max_position=MotorSystem.Z_MAX, min_position=MotorSystem.Z_MIN)
+        self.x_motor = DoubleMotor(x1_step_pin, x2_step_pin, dir_pin, max_position=10000, min_position=0)
+        self.y_motor = Motor(y_step_pin, dir_pin, max_position=10000, min_position=0)
+        self.z_motor = Motor(z_step_pin, dir_pin, max_position=10000, min_position=0)
         self.set_position(0, 0, 0)
         self.last_lim = time.ticks_us()
 
