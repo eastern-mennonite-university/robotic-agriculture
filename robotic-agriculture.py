@@ -30,7 +30,7 @@ valve_pin = Pin(22, Pin.OUT)
 servo_pin = Pin(21, Pin.OUT)
 
 # Water system pins
-flow_pin = Pin(23, Pin.IN, Pin.PULL_DOWN)
+flow_pin = Pin(23, Pin.IN)
 moisture1_pin = Pin(34, Pin.IN)
 moisture2_pin = Pin(39, Pin.IN)
 moisture3_pin = Pin(36, Pin.IN)
@@ -44,9 +44,6 @@ zp_lim_pin = Pin(32, Pin.IN, Pin.PULL_UP)
 zn_lim_pin = Pin(35, Pin.IN, Pin.PULL_UP)
 limit_pins = [xp_lim_pin,xn_lim_pin,yp_lim_pin,yn_lim_pin,zp_lim_pin,zn_lim_pin]
 
-def handle_interrupt(pin):
-    pass
-
 current_state = None
 uart = machine.UART(1, 115200, tx=1, rx=3)
 def main():
@@ -55,29 +52,26 @@ def main():
 
     # ps = PlantingState()
     # print(ps.generate_seed_coords(10, 10))
-
-    motor_system = MotorSystem()
-
-    seed_dispenser = SeedDispenser(servo_pin)
-    water_system = WaterSystem(valve_pin, flow_pin)
+    
+    current_state = IdleState()
+    motor_system = current_state.motor_system
+    seed_dispenser = current_state.dispenser
+    water_system = current_state.water_system
 
     # Set up handlers for limit switch interrupts
     for pin in limit_pins:
         pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.limit_handler)
-
     flow_pin.irq(trigger=Pin.IRQ_RISING, handler=water_system.water_pulse) 
 
-    frequency = 50
     # uart = machine.UART(0, 115200)
     uart.init(115200)
 
-
-    current_state = IdleState()
     while True:
         cmd = current_state.user_interface.get_input_line()
         if cmd is not None:
             if cmd == 'p down':
-                water_system.dispense(100)
+                if not water_system.dispensing:
+                    water_system.dispense(100)
             elif cmd == 'p up':
                 water_system.dispense(0)
             elif cmd == 'f down':
@@ -339,22 +333,33 @@ class WaterSystem:
         self.flow = 0
         self.dispense_target_ml = 0
         self.last_pulse = time.ticks_ms()
+        self.dispensing = False
 
     def update(self):
         '''Opens/closes valve based on what is needed. Returns True if it is
         open, False if it is now closed'''
-        if self.flow < self.dispense_target_ml:
-            self.valve_pin.on()
-            return True
+        if self.dispensing:
+            if self.flow < self.dispense_target_ml:
+                self.valve_pin.on()
+                return True
+            else:
+                self.valve_pin.off()
+                self.flow = 0
+                self.dispense_target_ml = 0
+                current_state.user_interface.output('flow limit reached')
+                self.dispensing = False
+                return False
         else:
-            self.valve_pin.off()
             self.flow = 0
-            self.dispense_target_ml = 0
-            return False
+            self.valve_pin.off()
 
     def dispense(self, dispense_target_ml):
-        '''Set the target amount of water to dispense, in mL'''
+        '''Set the target amount of water to dispense, in mL. Does not reset flow'''
         self.dispense_target_ml = dispense_target_ml
+        if dispense_target_ml > 0:
+            self.dispensing = True
+        else:
+            self.dispensing = False
 
     def water_pulse(self, _pin):
         '''Called by interrupt - increases flow by set rate'''
@@ -363,8 +368,12 @@ class WaterSystem:
         # Debounce signal (signal will never be above 400Hz)
         if ms_diff >= 0.001:
             self.flow += WaterSystem.FLOW_RATE
+            if round(self.flow/100) != round((self.flow-WaterSystem.FLOW_RATE)/100):
+                current_state.user_interface.output(self.flow)
+                # current_state.user_interface.output(str(self))
             self.last_pulse = current_ticks_ms
-        current_state.user_interface.output(str(self.flow) + '\n')
+        # current_state.user_interface.output(str(self.flow) + '\n')
+        # current_state.user_interface.output(str(self))
     
 class UserInterface:
     '''Class designed to get user input.'''
@@ -487,9 +496,6 @@ class CalibrationState(ProgramState):
         if self.x_cal_dir=='done' and self.y_cal_dir=='done' and self.z_cal_dir=='done':
             self.last_calibration = time.time()
             self.motor_system.normalize_positions()
-            self.user_interface.output(f'X: {self.motor_system.x_motor.min_position}, {self.motor_system.x_motor.max_position}')
-            self.user_interface.output(f'Y: {self.motor_system.y_motor.min_position}, {self.motor_system.y_motor.max_position}')
-            self.user_interface.output(f'Z: {self.motor_system.z_motor.min_position}, {self.motor_system.z_motor.max_position}')
             return IdleState(self)
         else:
             return self
@@ -507,15 +513,20 @@ class WateringState(ProgramState):
             self.motor_system.set_target(self.motor_system.x_motor.min_position+10, None, None)
             self.motor_system.update()
             if self.motor_system.at_target():
-                self.sub_state == 'watering'
+                self.sub_state = 'watering'
                 self.user_interface.output('(watering) done positioning, now watering \n')
         # Run the actual watering process
         if self.sub_state == 'watering':
             # TODO: This needs worked out
-            self.water_system.dispense(self.ml_per_step * (self.motor_system.x_motor.max_position-self.motor_system.x_motor.max_position))
+            self.water_system.dispense(self.ml_per_step * (self.motor_system.x_motor.max_position-self.motor_system.x_motor.min_position))
             self.water_system.update()
             # Our target x position should be f/r, where f is the total flow in
             # mL, and r is the number of mL per step
+            self.motor_system.set_target(int(self.water_system.flow/self.ml_per_step)+self.motor_system.x_motor.min_position, None, None)
+            self.motor_system.update()
+            # Done watering. TODO: save the time of last watering somewhere
+            if not self.water_system.dispensing:
+                return IdleState(self)
 
 
 
