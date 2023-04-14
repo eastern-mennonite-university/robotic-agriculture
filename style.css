@@ -64,7 +64,7 @@ div {
     height: 40%;
     margin: 10px;
     border-radius: 5px;
-    border: 1px solid black
+    border: 1px solid black;
     justify-content: space-evenly;
 }
 

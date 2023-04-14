@@ -8,6 +8,7 @@
     <!-- You may want to add other icon formats and sizes, but have this at the least: -->
     <link rel="shortcut icon" href="favicon.ico">
     <link rel="stylesheet" href="style.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
   </head>
 
   <body style="background-color: darkslategrey;">
@@ -59,5 +60,9 @@
       JavaScript is not enabled.
     </noscript>
   </body>
-
+  <script>
+    $('.btn').click(function() {
+      $.post('/publish', {topic: 'my/topic', payload: 'Hello, world!'});
+    });
+  </script>
 </html>
