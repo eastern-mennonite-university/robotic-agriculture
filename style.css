@@ -1,0 +1,61 @@
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+div {
+    text-align: center;
+    background-color: inherit;
+}
+
+.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    overflow: auto;
+    background: lightgrey; /* Just to visualize the extent */
+}
+
+#wrapper {
+    color: darkslategrey;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+#wrapper > div {
+    display: flex;
+    width: 100%;
+    border: 2px solid black;
+    border-radius: 8px;
+    margin: 10px;
+    background-color: white;
+}
+
+#status {
+    display: flex;
+    flex-direction: row;
+}
+
+#status > div {
+    border: 1px solid black;
+    border-radius: 5px;
+    margin: 10px;
+    width: 50%;
+}
+
+#bed {
+    background-color: lightblue;
+    display: flex;
+    flex-direction: row;
+    height: 40%;
+    margin: 10px;
+    border-radius: 5px;
+}
+
+#bed > div {
+    margin: 10px;
+    border: 1px solid black;
+}

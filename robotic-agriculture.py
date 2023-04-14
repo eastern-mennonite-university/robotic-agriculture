@@ -71,7 +71,7 @@ def main():
         if cmd is not None:
             if cmd == 'p down':
                 if not water_system.dispensing:
-                    water_system.dispense(100)
+                    water_system.dispense(500)
             elif cmd == 'p up':
                 water_system.dispense(0)
             elif cmd == 'f down':

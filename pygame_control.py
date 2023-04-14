@@ -2,6 +2,7 @@ import pygame
 import serial
 
 ser = serial.Serial('COM10', 115200)
+print(ser)
 
 pygame.init()
 
@@ -21,5 +22,5 @@ while True:
         elif event.type == pygame.KEYUP:
             ser.write(bytes(pygame.key.name(event.key) + ' up', 'utf-8'))
     while ser.in_waiting:
-        print(ser.readline().decode().strip())
+        print(ser.read().decode(), end='')
     pygame.display.update()
