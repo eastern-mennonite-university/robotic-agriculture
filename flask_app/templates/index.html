@@ -1,0 +1,75 @@
+<!doctype html>
+
+<html lang="en">
+
+  <head>
+    <meta charset="utf-8">
+    <title>EMU Agrobot</title>
+    <!-- You may want to add other icon formats and sizes, but have this at the least: -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+  </head>
+
+  <body style="background-color: darkslategrey;">
+    <main>
+    <div id="wrapper" class="fullscreen">
+      <div id="title" style="font-size: 200%; text-align: center; display: block">EMU Agrobot</div>
+      <div id="status" style="flex-grow:10">
+        <div id="watering">
+          <h2>Watering</h2>
+          <div id="bed">
+            <div class="centerbox" style="flex-grow: 1;">
+              <p style="font-size: x-large;"><span class="databox">80%</span></p>
+            </div>
+            <div class="centerbox" style="flex-grow: 1;">
+              <p style="font-size: x-large;"><span class="databox">70%</span></p>
+            </div>
+          </div>
+          Last watered:
+
+        </div>
+        <div>
+          <h2>Planting System</h2>
+          <div id="seeds">
+            <p>Layout: <span class="databox">20x10</span></p>
+            <p>Planted: <span class="databox">1:00 2023/4/14</span></p>
+          
+          </div>
+          <hr>
+          <div>
+            <input type="number" placeholder="# seeds x">
+            <input type="number" placeholder="# seeds y">
+            <button class="btn">plant</button>
+          </div>
+        </div>
+      </div>
+      <p style="text-align: left;">Current state: <span class="databox">Idle</span> Last updated: <span class="databox">2:05PM</span></p>
+      <div id="actions" style="flex-grow: 10;">      
+        <button class="btn" id="idle-btn">Switch to Idle State</button>
+        <button class="btn" id="calibrate-btn">Calibrate</button>
+        <button class="btn" id="water-btn">Run Watering Cycle</button>
+        <button class="btn" id="reset-btn">Reset</button>
+      </div>
+    </div>
+    </div>
+    </main>
+    <noscript>
+      <!-- Optional, place it wherever it makes sense -->
+      Please enable Javascript.
+    </noscript>
+  </body>
+  <script>
+    $('#idle-btn').click(function() {
+      $.post('/publish', {topic: 'agrobot/state', payload: 'idle'});
+    });
+    $('#calibrate-btn').click(function() {
+      $.post('/publish', {topic: 'agrobot/state', payload: 'calibrate'});
+    });
+    $('#water-btn').click(function() {
+      $.post('/publish', {topic: 'agrobot/state', payload: 'water'});
+    });
+    $('#reset-btn').click(function() {
+      $.post('/publish', {topic: 'agrobot/state', payload: 'idle'});
+    });
+  </script>
+</html>
