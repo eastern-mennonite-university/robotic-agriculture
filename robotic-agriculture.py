@@ -49,10 +49,11 @@ limit_pins = [xp_lim_pin,xn_lim_pin,yp_lim_pin,yn_lim_pin,zp_lim_pin,zn_lim_pin]
 
 current_state = None
 uart = machine.UART(1, 115200, tx=1, rx=3)
+mqtt_client = None
 
 sta_if = None 
 def main():
-    global current_state
+    global current_state, mqtt_client
     print('Script started')
 
     # ps = PlantingState()
@@ -584,6 +585,7 @@ class WateringState(ProgramState):
             self.motor_system.update()
             # Done watering. TODO: save the time of last watering somewhere
             if not self.water_system.dispensing:
+                
                 return IdleState(self)
 
 
