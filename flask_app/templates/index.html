@@ -19,10 +19,10 @@
           <h2>Watering</h2>
           <div id="bed">
             <div class="centerbox" style="flex-grow: 1;">
-              <p style="font-size: x-large;"><span class="databox">80%</span></p>
+              <p style="font-size: x-large;"><span class="databox">{{ data['moisture_1'] }}</span></p>
             </div>
             <div class="centerbox" style="flex-grow: 1;">
-              <p style="font-size: x-large;"><span class="databox">70%</span></p>
+              <p style="font-size: x-large;"><span class="databox"> {{ data['moisture_2'] }}</span></p>
             </div>
           </div>
           Last watered:
@@ -43,7 +43,7 @@
           </div>
         </div>
       </div>
-      <p style="text-align: left;">Current state: <span class="databox">Idle</span> Last updated: <span class="databox">2:05PM</span></p>
+      <p style="text-align: left;">Current state: <span class="databox">{{ data['current_state'] }}</span> Last update: <span class="databox">{{ data['last_update'] }}</span></p>
       <div id="actions" style="flex-grow: 10;">      
         <button class="btn" id="idle-btn">Switch to Idle State</button>
         <button class="btn" id="calibrate-btn">Calibrate</button>
