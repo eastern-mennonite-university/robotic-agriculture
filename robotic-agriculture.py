@@ -1,6 +1,7 @@
 
 import machine, time, math
 from machine import Pin
+import network
 
 # List of things that still need done
 # - [X~] Automated go to position with stepper motors
@@ -46,6 +47,8 @@ limit_pins = [xp_lim_pin,xn_lim_pin,yp_lim_pin,yn_lim_pin,zp_lim_pin,zn_lim_pin]
 
 current_state = None
 uart = machine.UART(1, 115200, tx=1, rx=3)
+
+sta_if = None 
 def main():
     global current_state
     print('Script started')
@@ -65,6 +68,8 @@ def main():
 
     # uart = machine.UART(0, 115200)
     uart.init(115200)
+
+    sta_if = do_connect()
 
     while True:
         cmd = current_state.user_interface.get_input_line()
@@ -93,6 +98,26 @@ def main():
 
         current_state.run()
         water_system.update()
+
+        if not sta_if.isconnected():
+            print('Disconnected. Reconnecting...')
+            sta_if.disconnect()
+            sta_if = do_connect()
+
+
+
+# Copied from Micropython documentation
+# https://docs.micropython.org/en/latest/esp8266/tutorial/network_basics.html
+def do_connect():
+    sta_if = network.WLAN(network.STA_IF)
+    if not sta_if.isconnected():
+        print('connecting to network...')
+        sta_if.active(True)
+        sta_if.connect('EMU-iot', '3BirdsOrCats')
+        while not sta_if.isconnected():
+            pass
+    print('network config:', sta_if.ifconfig())
+    return sta_if
 
 
 class MotorSystem:
