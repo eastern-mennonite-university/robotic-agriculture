@@ -2,6 +2,8 @@
 import machine, time, math
 from machine import Pin
 import network
+from umqttsimple import MQTTClient
+import ubinascii
 
 # List of things that still need done
 # - [X~] Automated go to position with stepper motors
@@ -71,6 +73,9 @@ def main():
 
     sta_if = do_connect()
 
+    last_update = time.time()
+    mqtt_client = connect_and_subscribe()
+
     while True:
         cmd = current_state.user_interface.get_input_line()
         if cmd is not None:
@@ -104,6 +109,10 @@ def main():
             sta_if.disconnect()
             sta_if = do_connect()
 
+        if (time.time() - last_update) >= 15:
+            mqtt_client.publish('emuagrobot22802/botdata', 'hello world')
+            last_update = time.time()
+
 
 
 # Copied from Micropython documentation
@@ -119,6 +128,22 @@ def do_connect():
     print('network config:', sta_if.ifconfig())
     return sta_if
 
+# Code for connecting to MQTT broker
+# Copied from https://randomnerdtutorials.com/micropython-mqtt-esp32-esp8266/
+def connect_and_subscribe():
+    topic_sub = 'emuagrobot22802/control'
+    client = MQTTClient(ubinascii.hexlify(machine.unique_id()), 'broker.hivemq.com')
+    client.set_callback(mqtt_callback)
+    client.connect()
+    client.subscribe(topic_sub)
+    print('Connected to %s MQTT broker, subscribed to %s topic' % ('broker.hivemq.com', topic_sub))
+    return client
+
+def mqtt_callback(topic, msg):
+    '''Handler for MQTT callback'''
+    global current_state
+    print('mqtt callback')
+    pass
 
 class MotorSystem:
     '''Class designed to abstract away the problems with our motor set up. 
