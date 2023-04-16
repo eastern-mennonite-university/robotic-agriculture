@@ -74,7 +74,10 @@ def main():
     sta_if = do_connect()
 
     last_update = time.time()
-    mqtt_client = connect_and_subscribe()
+    try:
+        mqtt_client = connect_and_subscribe()
+    except OSError as e:
+        restart_and_reconnect()
 
     while True:
         cmd = current_state.user_interface.get_input_line()
@@ -138,6 +141,11 @@ def connect_and_subscribe():
     client.subscribe(topic_sub)
     print('Connected to %s MQTT broker, subscribed to %s topic' % ('broker.hivemq.com', topic_sub))
     return client
+
+def restart_and_reconnect():
+  print('Failed to connect to MQTT broker. Reconnecting...')
+  time.sleep(10)
+  machine.reset()
 
 def mqtt_callback(topic, msg):
     '''Handler for MQTT callback'''
