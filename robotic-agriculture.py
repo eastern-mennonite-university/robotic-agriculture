@@ -75,10 +75,6 @@ def main():
     sta_if = do_connect()
 
     last_update = time.time()
-    try:
-        mqtt_client = connect_and_subscribe()
-    except OSError as e:
-        restart_and_reconnect()
 
     while True:
         cmd = current_state.user_interface.get_input_line()
@@ -132,27 +128,15 @@ def do_connect():
     print('network config:', sta_if.ifconfig())
     return sta_if
 
-# Code for connecting to MQTT broker
-# Copied from https://randomnerdtutorials.com/micropython-mqtt-esp32-esp8266/
-def connect_and_subscribe():
-    topic_sub = 'emuagrobot22802/control'
-    client = MQTTClient(ubinascii.hexlify(machine.unique_id()), 'broker.hivemq.com')
-    client.set_callback(mqtt_callback)
-    client.connect()
-    client.subscribe(topic_sub)
-    print('Connected to %s MQTT broker, subscribed to %s topic' % ('broker.hivemq.com', topic_sub))
-    return client
+
+
 
 def restart_and_reconnect():
   print('Failed to connect to MQTT broker. Reconnecting...')
   time.sleep(10)
   machine.reset()
 
-def mqtt_callback(topic, msg):
-    '''Handler for MQTT callback'''
-    global current_state
-    print('mqtt callback')
-    pass
+
 
 class MotorSystem:
     '''Class designed to abstract away the problems with our motor set up. 
@@ -439,6 +423,15 @@ class UserInterface:
     def __init__(self) -> None:
         self.uart = machine.UART(1, 115200, tx=1, rx=3)
         self.uart.init()
+
+        # Code for connecting to MQTT broker
+        # Copied from https://randomnerdtutorials.com/micropython-mqtt-esp32-esp8266/
+        topic_sub = 'emuagrobot22802/control'
+        self.mqttclient = MQTTClient(ubinascii.hexlify(machine.unique_id()), 'broker.hivemq.com')
+        self.mqttclient.set_callback(self.mqtt_callback)
+        self.mqttclient.connect()
+        self.mqttclient.subscribe(topic_sub)
+        print('Connected to %s MQTT broker, subscribed to %s topic' % ('broker.hivemq.com', topic_sub))
         pass
 
     def get_input_line(self):
@@ -449,6 +442,12 @@ class UserInterface:
     
     def output(self, out_string):
         self.uart.write(out_string.strip() + '\n')
+        self.mqttclient.publish('emuagrobot22802/message', out_string)
+
+    def mqtt_callback(topic, msg):
+        '''Handler for MQTT callback'''
+        print(f'{topic}: {msg}')
+        
 
 
 # --------------------------------------------------------------------------
