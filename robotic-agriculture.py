@@ -1,5 +1,5 @@
 
-import machine, time, math
+import machine, time, math, json
 from machine import Pin
 import network
 from umqttsimple import MQTTClient
@@ -109,7 +109,8 @@ def main():
             sta_if = do_connect()
 
         if (time.time() - last_update) >= 15:
-            current_state.user_interface.mqtt_client.publish('emuagrobot22802/botdata', 'hello world')
+            bot_data_string = json.dumps(current_state.bot_data())
+            current_state.user_interface.mqtt_client.publish('emuagrobot22802/botdata', bot_data_string)
             last_update = time.time()
 
 
@@ -373,9 +374,11 @@ class WaterSystem:
         self.valve_pin = valve_pin
         self.flow_pin = flow_pin
         self.flow = 0
+        self.total_flow = 0
         self.dispense_target_ml = 0
         self.last_pulse = time.ticks_ms()
         self.dispensing = False
+        self.last_water = None
 
     def update(self):
         '''Opens/closes valve based on what is needed. Returns True if it is
@@ -410,6 +413,7 @@ class WaterSystem:
         # Debounce signal (signal will never be above 400Hz)
         if ms_diff >= 0.001:
             self.flow += WaterSystem.FLOW_RATE
+            self.total_flow += WaterSystem.FLOW_RATE
             if round(self.flow/100) != round((self.flow-WaterSystem.FLOW_RATE)/100):
                 current_state.user_interface.output(self.flow)
                 # current_state.user_interface.output(str(self))
@@ -478,10 +482,24 @@ class ProgramState:
         '''Called every program cycle, ideally'''
         raise NotImplementedError
     
+    def bot_data(self) -> dict:
+        data = dict()
+        data['current_state'] = self.state_name()
+        data['current_time'] = time.time()
+        data['last_water'] = self.water_system.last_water
+        data['total_water_ml'] = self.water_system.total_flow
+        # TODO: Add moisture data here
+
+    def state_name(self):
+        return 'none'
+    
 class IdleState(ProgramState):
     '''State representing when the machine is doing nothing'''
     def run(self):
         pass
+
+    def state_name(self):
+        return 'idle'
 
 class CalibrationState(ProgramState):
     x_cal_dir: str
@@ -556,6 +574,9 @@ class CalibrationState(ProgramState):
             return IdleState(self)
         else:
             return self
+        
+    def state_name(self):
+        return 'calibration'
 
 
 class WateringState(ProgramState):
@@ -564,6 +585,7 @@ class WateringState(ProgramState):
         self.sub_state = 'positioning'
         # TODO: Figure out ml per step.
         self.ml_per_step = 10
+        self.water_system.last_water = time.time()
     def run(self):
         # Position the gantry at the starting position
         if self.sub_state == 'positioning':
@@ -585,10 +607,8 @@ class WateringState(ProgramState):
             if not self.water_system.dispensing:
                 
                 return IdleState(self)
-
-
-
-
+    def state_name(self):
+        return 'watering'
 
 class PlantingState(ProgramState):
     def __init__(self, previous_state: 'ProgramState' = None, nx=0, ny=0):
@@ -653,6 +673,9 @@ class PlantingState(ProgramState):
             self.current_seed_index += 1
             self.sub_state = 'up'
         return self
+    
+    def state_name(self):
+        return 'planting'
 
 if __name__=='__main__':
     main()
