@@ -49,11 +49,10 @@ limit_pins = [xp_lim_pin,xn_lim_pin,yp_lim_pin,yn_lim_pin,zp_lim_pin,zn_lim_pin]
 
 current_state = None
 uart = machine.UART(1, 115200, tx=1, rx=3)
-mqtt_client = None
 
 sta_if = None 
 def main():
-    global current_state, mqtt_client
+    global current_state
     print('Script started')
 
     # ps = PlantingState()
@@ -110,7 +109,7 @@ def main():
             sta_if = do_connect()
 
         if (time.time() - last_update) >= 15:
-            mqtt_client.publish('emuagrobot22802/botdata', 'hello world')
+            current_state.user_interface.mqtt_client.publish('emuagrobot22802/botdata', 'hello world')
             last_update = time.time()
 
 
@@ -427,10 +426,10 @@ class UserInterface:
         # Code for connecting to MQTT broker
         # Copied from https://randomnerdtutorials.com/micropython-mqtt-esp32-esp8266/
         topic_sub = 'emuagrobot22802/control'
-        self.mqttclient = MQTTClient(ubinascii.hexlify(machine.unique_id()), 'broker.hivemq.com')
-        self.mqttclient.set_callback(self.mqtt_callback)
-        self.mqttclient.connect()
-        self.mqttclient.subscribe(topic_sub)
+        self.mqtt_client = MQTTClient(ubinascii.hexlify(machine.unique_id()), 'broker.hivemq.com')
+        self.mqtt_client.set_callback(self.mqtt_callback)
+        self.mqtt_client.connect()
+        self.mqtt_client.subscribe(topic_sub)
         print('Connected to %s MQTT broker, subscribed to %s topic' % ('broker.hivemq.com', topic_sub))
         pass
 
@@ -442,7 +441,7 @@ class UserInterface:
     
     def output(self, out_string):
         self.uart.write(out_string.strip() + '\n')
-        self.mqttclient.publish('emuagrobot22802/message', out_string)
+        self.mqtt_client.publish('emuagrobot22802/message', out_string)
 
     def mqtt_callback(topic, msg):
         '''Handler for MQTT callback'''
