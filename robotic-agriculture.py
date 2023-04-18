@@ -3,7 +3,7 @@ import machine, time, math, json
 from machine import Pin
 import network
 # from umqttsimple import MQTTClient
-import ubinascii
+# import ubinascii
 
 # List of things that still need done
 # - [X~] Automated go to position with stepper motors
@@ -19,7 +19,7 @@ import ubinascii
 #    - [X] Idle State
 #    - [X] Calibration State
 #    - [ ] Watering State
-#    - [ ] Planting State
+#    - [X] Planting State
 
 
 # Define all of the pins
@@ -54,9 +54,6 @@ sta_if = None
 def main():
     global current_state
     print('Script started')
-
-    # ps = PlantingState()
-    # print(ps.generate_seed_coords(10, 10))
     
     current_state = IdleState()
     motor_system = current_state.motor_system
@@ -67,9 +64,6 @@ def main():
     for pin in limit_pins:
         pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.limit_handler)
     flow_pin.irq(trigger=Pin.IRQ_RISING, handler=water_system.water_pulse) 
-
-    # uart = machine.UART(0, 115200)
-    # uart.init(115200)
 
     # sta_if = do_connect()
 
@@ -105,7 +99,7 @@ def main():
         water_system.update()
 
         # if not sta_if.isconnected():
-        #     print('Disconnected. Reconnecting...')
+        #     current_state.user_interface.output('Disconnected. Reconnecting...')
         #     sta_if.disconnect()
         #     sta_if = do_connect()
 
@@ -118,23 +112,24 @@ def main():
 
 # Copied from Micropython documentation
 # https://docs.micropython.org/en/latest/esp8266/tutorial/network_basics.html
-def do_connect():
-    print('connecting')
-    sta_if = network.WLAN(network.STA_IF)
-    if not sta_if.isconnected():
-        print('connecting to network...')
-        sta_if.active(True)
-        sta_if.connect('EMU-iot', '3BirdsOrCats')
-        while not sta_if.isconnected():
-            pass
-    print('network config:', sta_if.ifconfig())
-    return sta_if
+# def do_connect():
+#     global current_state
+#     current_state.user_interface.output('connecting')
+#     sta_if = network.WLAN(network.STA_IF)
+#     if not sta_if.isconnected():
+#         current_state.user_interface.output('connecting to network...')
+#         sta_if.active(True)
+#         sta_if.connect('EMU-iot', '3BirdsOrCats')
+#         while not sta_if.isconnected():
+#             pass
+#     current_state.user_interface.output('network config:', sta_if.ifconfig())
+#     return sta_if
 
 
 
 
 def restart_and_reconnect():
-  print('Failed to connect to MQTT broker. Reconnecting...')
+  current_state.user_interface.output('Failed to connect to MQTT broker. Reconnecting...')
   time.sleep(10)
   machine.reset()
 
@@ -175,7 +170,6 @@ class MotorSystem:
         curr_time = time.ticks_us()
         # Debounce the switch, and make sure we aren't calibrating right now
         if time.ticks_diff(curr_time, self.last_lim)>100_000 and not isinstance(current_state, CalibrationState):
-            print(str(pin))
             if str(pin)==str(xp_lim_pin):
                 self.x_motor.set_position(self.x_motor.max_position)
             elif str(pin)==str(xn_lim_pin):
@@ -277,9 +271,7 @@ class Motor:
 
     def run_speed(self):
         '''Checks the timers for the motor and does a `step()` if needed.'''
-        # print('runspeed')
         current_time = time.ticks_us()
-        # print(current_time)
         if time.ticks_diff(current_time, self.previous_step_ticks) >= self.step_interval:
             self.step(reverse=(self.velocity<0))
             # This equation is confusing because we need to make sure our previous
@@ -291,7 +283,6 @@ class Motor:
     def step(self, reverse: bool=False):
         '''Perform one step. If `reverse` is set, go the opposite way. Uses `self.min_pulse_width` to calculate length of pulse'''
         # First, set the direction pin
-        # print(self.position)
         if (reverse): 
             self.dir_pin.on()
             self.position -= 1
@@ -436,7 +427,7 @@ class UserInterface:
         # self.mqtt_client.set_callback(self.mqtt_callback)
         # self.mqtt_client.connect()
         # self.mqtt_client.subscribe(topic_sub)
-        # print('Connected to %s MQTT broker, subscribed to %s topic' % ('broker.hivemq.com', topic_sub))
+        # self.output('Connected to %s MQTT broker, subscribed to %s topic' % ('broker.hivemq.com', topic_sub))
         pass
 
     def get_input_line(self):
@@ -449,9 +440,9 @@ class UserInterface:
         self.uart.write(out_string.strip() + '\n')
         # self.mqtt_client.publish('emuagrobot22802/message', out_string)
 
-    def mqtt_callback(topic, msg):
+    def mqtt_callback(self, topic, msg):
         '''Handler for MQTT callback'''
-        print(f'{topic}: {msg}')
+        self.output(f'{topic}: {msg}')
         
 
 
