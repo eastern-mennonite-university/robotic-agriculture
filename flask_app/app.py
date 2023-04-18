@@ -3,7 +3,7 @@ from flask_mqtt import Mqtt
 import json
 from datetime import datetime
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='/agrobot/static', static_folder='/home/caleb/agrobot/robotic-agriculture/flask_app/static')
 app.config['MQTT_BROKER_URL'] = 'broker.hivemq.com'
 app.config['MQTT_BROKER_PORT'] = 1883
 app.config['MQTT_KEEPALIVE'] = 5
