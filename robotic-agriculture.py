@@ -2,7 +2,7 @@
 import machine, time, math, json
 from machine import Pin
 import network
-from umqttsimple import MQTTClient
+# from umqttsimple import MQTTClient
 import ubinascii
 
 # List of things that still need done
@@ -48,7 +48,7 @@ zn_lim_pin = Pin(35, Pin.IN, Pin.PULL_UP)
 limit_pins = [xp_lim_pin,xn_lim_pin,yp_lim_pin,yn_lim_pin,zp_lim_pin,zn_lim_pin]
 
 current_state = None
-uart = machine.UART(1, 115200, tx=1, rx=3)
+# uart = machine.UART(1, 115200, tx=1, rx=3)
 
 sta_if = None 
 def main():
@@ -69,9 +69,9 @@ def main():
     flow_pin.irq(trigger=Pin.IRQ_RISING, handler=water_system.water_pulse) 
 
     # uart = machine.UART(0, 115200)
-    uart.init(115200)
+    # uart.init(115200)
 
-    sta_if = do_connect()
+    # sta_if = do_connect()
 
     last_update = time.time()
 
@@ -79,9 +79,10 @@ def main():
         cmd = current_state.user_interface.get_input_line()
         if cmd is not None:
             if cmd == 'p down':
+                current_state.user_interface.output(str(water_system.total_flow))
                 if not water_system.dispensing:
-                    water_system.dispense(500)
-            elif cmd == 'p up':
+                    water_system.dispense(2000)
+            elif cmd == 'q up':
                 water_system.dispense(0)
             elif cmd == 'f down':
                 seed_dispenser.dispense()
@@ -97,27 +98,28 @@ def main():
                 current_state = WateringState(current_state)
                 current_state.user_interface.output('starting watering routine \n')
             elif cmd == '4 down':
-                current_state = PlantingState(current_state)
                 current_state.user_interface.output('starting planting routine \n')
+                current_state = PlantingState(current_state, 5, 5)
 
         current_state.run()
         water_system.update()
 
-        if not sta_if.isconnected():
-            print('Disconnected. Reconnecting...')
-            sta_if.disconnect()
-            sta_if = do_connect()
+        # if not sta_if.isconnected():
+        #     print('Disconnected. Reconnecting...')
+        #     sta_if.disconnect()
+        #     sta_if = do_connect()
 
-        if (time.time() - last_update) >= 15:
-            bot_data_string = json.dumps(current_state.bot_data())
-            current_state.user_interface.mqtt_client.publish('emuagrobot22802/botdata', bot_data_string)
-            last_update = time.time()
+        # if (time.time() - last_update) >= 15:
+        #     bot_data_string = json.dumps(current_state.bot_data())
+        #     current_state.user_interface.mqtt_client.publish('emuagrobot22802/botdata', bot_data_string)
+        #     last_update = time.time()
 
 
 
 # Copied from Micropython documentation
 # https://docs.micropython.org/en/latest/esp8266/tutorial/network_basics.html
 def do_connect():
+    print('connecting')
     sta_if = network.WLAN(network.STA_IF)
     if not sta_if.isconnected():
         print('connecting to network...')
@@ -181,7 +183,7 @@ class MotorSystem:
             elif str(pin)==str(yp_lim_pin):
                 self.y_motor.set_position(self.y_motor.max_position)
             elif str(pin)==str(yn_lim_pin):
-                self.x_motor.set_position(self.x_motor.min_position)
+                self.y_motor.set_position(self.y_motor.min_position)
             elif str(pin)==str(zp_lim_pin):
                 self.z_motor.set_position(self.z_motor.max_position)
             elif str(pin)==str(zn_lim_pin):
@@ -369,7 +371,7 @@ class WaterSystem:
     # So ratio is 660 pulses/Liter
     # or 1.515 mL per pulse
     global current_state
-    FLOW_RATE = 1.515
+    FLOW_RATE = 1.75 # Originally was 1.515
     def __init__(self, valve_pin, flow_pin):
         self.valve_pin = valve_pin
         self.flow_pin = flow_pin
@@ -391,7 +393,7 @@ class WaterSystem:
                 self.valve_pin.off()
                 self.flow = 0
                 self.dispense_target_ml = 0
-                current_state.user_interface.output('flow limit reached')
+                current_state.user_interface.output('flow limit reached. Total flow: ' + str(self.total_flow))
                 self.dispensing = False
                 return False
         else:
@@ -411,9 +413,9 @@ class WaterSystem:
         current_ticks_ms = time.ticks_ms()
         ms_diff = time.ticks_diff(current_ticks_ms, self.last_pulse)
         # Debounce signal (signal will never be above 400Hz)
-        if ms_diff >= 0.001:
+        self.total_flow += WaterSystem.FLOW_RATE
+        if ms_diff >= 0.001 or True:
             self.flow += WaterSystem.FLOW_RATE
-            self.total_flow += WaterSystem.FLOW_RATE
             if round(self.flow/100) != round((self.flow-WaterSystem.FLOW_RATE)/100):
                 current_state.user_interface.output(self.flow)
                 # current_state.user_interface.output(str(self))
@@ -429,12 +431,12 @@ class UserInterface:
 
         # Code for connecting to MQTT broker
         # Copied from https://randomnerdtutorials.com/micropython-mqtt-esp32-esp8266/
-        topic_sub = 'emuagrobot22802/control'
-        self.mqtt_client = MQTTClient(ubinascii.hexlify(machine.unique_id()), 'broker.hivemq.com')
-        self.mqtt_client.set_callback(self.mqtt_callback)
-        self.mqtt_client.connect()
-        self.mqtt_client.subscribe(topic_sub)
-        print('Connected to %s MQTT broker, subscribed to %s topic' % ('broker.hivemq.com', topic_sub))
+        # topic_sub = 'emuagrobot22802/control'
+        # self.mqtt_client = MQTTClient(ubinascii.hexlify(machine.unique_id()), 'broker.hivemq.com')
+        # self.mqtt_client.set_callback(self.mqtt_callback)
+        # self.mqtt_client.connect()
+        # self.mqtt_client.subscribe(topic_sub)
+        # print('Connected to %s MQTT broker, subscribed to %s topic' % ('broker.hivemq.com', topic_sub))
         pass
 
     def get_input_line(self):
@@ -445,7 +447,7 @@ class UserInterface:
     
     def output(self, out_string):
         self.uart.write(out_string.strip() + '\n')
-        self.mqtt_client.publish('emuagrobot22802/message', out_string)
+        # self.mqtt_client.publish('emuagrobot22802/message', out_string)
 
     def mqtt_callback(topic, msg):
         '''Handler for MQTT callback'''
@@ -620,8 +622,8 @@ class PlantingState(ProgramState):
     def generate_seed_coords(self, nx: int, ny: int, min_steps_between=0):
         min_length = nx*min_steps_between
         min_width = ny*min_steps_between
-        x_range = (self.motor_system.x_motor.max_position-self.motor_system.x_motor.min_positoin)
-        y_range = (self.motor_system.y_motor.max_position-self.motor_system.y_motor.min_positoin)
+        x_range = (self.motor_system.x_motor.max_position-self.motor_system.x_motor.min_position)
+        y_range = (self.motor_system.y_motor.max_position-self.motor_system.y_motor.min_position)
         if min_length > x_range:
             self.user_interface.output('too long!')
             self.seeds = []
@@ -678,4 +680,5 @@ class PlantingState(ProgramState):
         return 'planting'
 
 if __name__=='__main__':
+    print('starting up')
     main()
