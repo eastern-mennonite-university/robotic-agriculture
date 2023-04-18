@@ -60,16 +60,16 @@
   </body>
   <script>
     $('#idle-btn').click(function() {
-      $.post('/publish', {topic: 'agrobot/state', payload: 'idle'});
+      $.post('/agrobot/publish', {topic: 'agrobot/state', payload: 'idle'});
     });
     $('#calibrate-btn').click(function() {
-      $.post('/publish', {topic: 'agrobot/state', payload: 'calibrate'});
+      $.post('/agrobot/publish', {topic: 'agrobot/state', payload: 'calibrate'});
     });
     $('#water-btn').click(function() {
-      $.post('/publish', {topic: 'agrobot/state', payload: 'water'});
+      $.post('/agrobot/publish', {topic: 'agrobot/state', payload: 'water'});
     });
     $('#reset-btn').click(function() {
-      $.post('/publish', {topic: 'agrobot/state', payload: 'idle'});
+      $.post('/agrobot/publish', {topic: 'agrobot/state', payload: 'idle'});
     });
   </script>
 </html>
