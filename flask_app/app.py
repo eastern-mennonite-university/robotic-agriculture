@@ -28,11 +28,11 @@ def handle_mqtt_message(client, userdata, message):
     print(data)
 
 # Route to display the latest message
-@app.route('/')
+@app.route('/agrobot/')
 def index():
     return render_template('index.html', data=bot_data)
 
-@app.route('/publish', methods=['POST'])
+@app.route('/agrobot/publish', methods=['POST'])
 def publish_message():
     payload = request.form['payload']
     mqtt.publish('emuagrobot22802/control', payload)
