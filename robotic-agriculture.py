@@ -75,7 +75,7 @@ def main():
             if cmd == 'p down':
                 current_state.user_interface.output(str(water_system.total_flow))
                 if not water_system.dispensing:
-                    water_system.dispense(2000)
+                    water_system.dispense(100)
             elif cmd == 'q up':
                 water_system.dispense(0)
             elif cmd == 'f down':
@@ -112,18 +112,19 @@ def main():
 
 # Copied from Micropython documentation
 # https://docs.micropython.org/en/latest/esp8266/tutorial/network_basics.html
-# def do_connect():
-#     global current_state
-#     current_state.user_interface.output('connecting')
-#     sta_if = network.WLAN(network.STA_IF)
-#     if not sta_if.isconnected():
-#         current_state.user_interface.output('connecting to network...')
-#         sta_if.active(True)
-#         sta_if.connect('EMU-iot', '3BirdsOrCats')
-#         while not sta_if.isconnected():
-#             pass
-#     current_state.user_interface.output('network config:', sta_if.ifconfig())
-#     return sta_if
+def do_connect():
+    global current_state
+    current_state.user_interface.output('connecting')
+    sta_if = network.WLAN(network.STA_IF)
+    current_state.user_interface.output(str(sta_if.config('mac')))
+    if not sta_if.isconnected():
+        current_state.user_interface.output('connecting to network...')
+        sta_if.active(True)
+        sta_if.connect('EMU-iot', '3BirdsOrCats')
+        while not sta_if.isconnected():
+            pass
+    current_state.user_interface.output('network config:', sta_if.ifconfig())
+    return sta_if
 
 
 
@@ -167,6 +168,7 @@ class MotorSystem:
     # Handler for limit switch interrupts
     # Will update the positions of the motors
     def limit_handler(self, pin):
+        global current_state
         curr_time = time.ticks_us()
         # Debounce the switch, and make sure we aren't calibrating right now
         if time.ticks_diff(curr_time, self.last_lim)>100_000 and not isinstance(current_state, CalibrationState):
@@ -182,6 +184,7 @@ class MotorSystem:
                 self.z_motor.set_position(self.z_motor.max_position)
             elif str(pin)==str(zn_lim_pin):
                 self.z_motor.set_position(self.z_motor.min_position)
+            current_state.user_interface.output('limit switch: ' + str(pin))
         self.last_lim = curr_time
 
     def at_target(self):
@@ -362,7 +365,7 @@ class WaterSystem:
     # So ratio is 660 pulses/Liter
     # or 1.515 mL per pulse
     global current_state
-    FLOW_RATE = 1.75 # Originally was 1.515
+    FLOW_RATE = 3.5 # Originally was 1.515
     def __init__(self, valve_pin, flow_pin):
         self.valve_pin = valve_pin
         self.flow_pin = flow_pin
@@ -488,8 +491,11 @@ class ProgramState:
     
 class IdleState(ProgramState):
     '''State representing when the machine is doing nothing'''
+    def __init__(self, previous_state: 'ProgramState' = None):
+        super().__init__(previous_state)
+
     def run(self):
-        pass
+        return self
 
     def state_name(self):
         return 'idle'
@@ -506,9 +512,10 @@ class CalibrationState(ProgramState):
     max_z: int
     def __init__(self, previous_state: 'ProgramState' = None):
         super().__init__(previous_state)
-        self.x_cal_dir = 'positive'
-        self.y_cal_dir = 'positive'
-        self.z_cal_dir = 'positive'
+        # Do the Z calibration first so it doesn't drag through the dirt
+        self.x_cal_dir = 'none'
+        self.y_cal_dir = 'none'
+        self.z_cal_dir = 'negative'
     def run(self):
         # Check for limit switch hits (remember, False=hit)
         if self.x_cal_dir=='positive' and xp_lim_pin.value() == False:
@@ -518,7 +525,9 @@ class CalibrationState(ProgramState):
             self.y_cal_dir = 'negative'
             self.motor_system.y_motor.max_position = self.motor_system.y_motor.position
         if self.z_cal_dir=='positive' and zp_lim_pin.value() == False:
-            self.z_cal_dir = 'negative'
+            self.x_cal_dir = 'positive'
+            self.y_cal_dir = 'positive'
+            self.z_cal_dir = 'done'
             self.motor_system.z_motor.max_position = self.motor_system.z_motor.position
 
         if self.x_cal_dir=='negative' and xn_lim_pin.value() == False:
@@ -528,7 +537,7 @@ class CalibrationState(ProgramState):
             self.y_cal_dir = 'done'
             self.motor_system.y_motor.min_position = self.motor_system.y_motor.position
         if self.z_cal_dir=='negative' and zn_lim_pin.value() == False:
-            self.z_cal_dir = 'done'
+            self.z_cal_dir = 'positive'
             self.motor_system.z_motor.min_position = self.motor_system.z_motor.position
 
         # Check which point we are at for each of the stepper motors, and set the
@@ -537,19 +546,19 @@ class CalibrationState(ProgramState):
             self.motor_system.x_motor.set_velocity(self.motor_system.x_motor.max_vel)
         elif self.x_cal_dir == 'negative':
             self.motor_system.x_motor.set_velocity(-self.motor_system.x_motor.max_vel)
-        elif self.x_cal_dir == 'done':
+        else:
             self.motor_system.x_motor.set_velocity(0)
         if self.y_cal_dir == 'positive':
             self.motor_system.y_motor.set_velocity(self.motor_system.y_motor.max_vel)
         elif self.y_cal_dir == 'negative':
             self.motor_system.y_motor.set_velocity(-self.motor_system.y_motor.max_vel)
-        elif self.y_cal_dir == 'done':
+        else:
             self.motor_system.y_motor.set_velocity(0)
         if self.z_cal_dir == 'positive':
             self.motor_system.z_motor.set_velocity(self.motor_system.z_motor.max_vel)
         elif self.z_cal_dir == 'negative':
             self.motor_system.z_motor.set_velocity(-self.motor_system.z_motor.max_vel)
-        elif self.z_cal_dir == 'done':
+        else:
             self.motor_system.z_motor.set_velocity(0)
 
         # Once all the speeds are set, call our run_speed function.
@@ -564,6 +573,9 @@ class CalibrationState(ProgramState):
         if self.x_cal_dir=='done' and self.y_cal_dir=='done' and self.z_cal_dir=='done':
             self.last_calibration = time.time()
             self.motor_system.normalize_positions()
+            current_state.user_interface.output(f'X: {-current_state.motor_system.x_motor.min_position + current_state.motor_system.x_motor.max_position}')
+            current_state.user_interface.output(f'Y: {-current_state.motor_system.y_motor.min_position + current_state.motor_system.y_motor.max_position}')
+            current_state.user_interface.output(f'Z: {-current_state.motor_system.z_motor.min_position + current_state.motor_system.z_motor.max_position}')
             return IdleState(self)
         else:
             return self
