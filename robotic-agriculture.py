@@ -95,7 +95,7 @@ def main():
                 current_state.user_interface.output('starting watering routine \n')
             elif cmd == '4 down':
                 current_state.user_interface.output('starting planting routine \n')
-                current_state = PlantingState(current_state, 5, 5)
+                current_state = PlantingState(current_state, 6, 3, 0, 2)
 
         current_state = current_state.run()
         water_system.update()
@@ -621,46 +621,56 @@ class WateringState(ProgramState):
 
         zones = 6
         zone_width = math.floor(self.motor_system.dimensions()[0]/zones)
-        self.target_positions = [zone_width*i for i in range(7)]
+        self.target_positions = [zone_width*i for i in range(zones+1)]
         self.target_i = 0
 
     def run(self):
         # Position the gantry at the starting position
         if self.sub_state == 'initial':
-            self.motor_system.set_target(self.target_positions[0], None, None)
+            self.motor_system.set_target(self.target_positions[0], None, self.motor_system.z_motor.max_position)
             self.motor_system.update()
             if self.motor_system.at_target():
                 self.user_interface.output('reached starting position, now watering \n')
-                self.pulse_start_time = time.time()
+                self.pulse_start_time = time.ticks_ms()
                 self.water_system.dispense(100)
-                self.last_dispense_i = 0
                 self.sub_state = 'watering'
         # Run the actual watering process
         if self.sub_state == 'watering':
             self.water_system.update()
             # Our target x position should be f/r, where f is the total flow in
             # mL, and r is the number of mL per step
-            self.motor_system.set_target(int(self.water_system.flow/self.ml_per_step)+self.motor_system.x_motor.min_position, None, None)
+            zone_progress = time.ticks_diff(time.ticks_ms(), self.pulse_start_time)/20000
+            target_x_position = int(zone_progress*(self.target_positions[self.target_i+1]-self.target_positions[self.target_i]) + self.target_positions[self.target_i])
+            self.motor_system.set_target(target_x_position, None, None)
             self.motor_system.update()
-            # Done watering. TODO: save the time of last watering somewhere
-            if not self.water_system.dispensing:
-                
-                return IdleState(self)
+            if zone_progress >= 1:
+                if self.target_i + 1 == 6:
+                    return IdleState(self)
+                else:
+                    self.target_i += 1
+                    self.water_system.dispense(100)
+                    self.pulse_start_time = time.ticks_ms()
+        return self
+
     def state_name(self):
         return 'watering'
 
 class PlantingState(ProgramState):
-    def __init__(self, previous_state: 'ProgramState' = None, nx=0, ny=0):
+    def __init__(self, previous_state: 'ProgramState' = None, nx=0, ny=0, min_steps_between=0, segment=0):
         super().__init__(previous_state)
         self.current_seed_index = 0
         self.sub_state = 'up'
-        self.generate_seed_coords(nx, ny)
+        self.generate_seed_coords(nx, ny, min_steps_between, segment)
 
-    def generate_seed_coords(self, nx: int, ny: int, min_steps_between=0):
+    def generate_seed_coords(self, nx: int, ny: int, min_steps_between=0, segment=0):
         min_length = nx*min_steps_between
         min_width = ny*min_steps_between
-        x_range = (self.motor_system.x_motor.max_position-self.motor_system.x_motor.min_position)
+
         y_range = (self.motor_system.y_motor.max_position-self.motor_system.y_motor.min_position)
+        if segment==0:
+            x_range = (self.motor_system.x_motor.max_position-self.motor_system.x_motor.min_position)
+        else:
+            x_range = (self.motor_system.x_motor.max_position-self.motor_system.x_motor.min_position)//2
         if min_length > x_range:
             self.user_interface.output('too long!')
             self.seeds = []
@@ -668,10 +678,15 @@ class PlantingState(ProgramState):
             self.user_interface.output('too wide!')
             self.seeds = []
         else:
+            if segment==0 or segment==1:
+                starting_x = self.motor_system.x_motor.min_position
+            else:
+                starting_x = self.motor_system.x_motor.min_position + x_range - 1
+
             seeds = []
             for x in range(nx):
                 for y in range(ny):
-                    x_pos = self.motor_system.x_motor.min_position + round((x+.5)*(x_range/nx))
+                    x_pos = starting_x + round((x+.5)*(x_range/nx))
                     y_pos = self.motor_system.x_motor.min_position + round((y+.5)*(y_range/ny))
                     seeds.append((x_pos, y_pos))
             self.seeds = seeds
