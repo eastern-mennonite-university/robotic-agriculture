@@ -34,9 +34,9 @@ servo_pin = Pin(21, Pin.OUT)
 
 # Water system pins
 flow_pin = Pin(23, Pin.IN)
-moisture1_pin = Pin(34, Pin.IN)
-moisture2_pin = Pin(39, Pin.IN)
-moisture3_pin = Pin(36, Pin.IN)
+moisture1_pin = Pin(34)
+moisture2_pin = Pin(39)
+moisture3_pin = Pin(36)
 
 # Limit switch pins
 xp_lim_pin = Pin(4, Pin.IN, Pin.PULL_UP)
@@ -82,6 +82,8 @@ def main():
                 seed_dispenser.dispense()
             elif cmd == 'f up':
                 seed_dispenser.collect()
+            elif cmd == 'm down':
+                current_state.user_interface.output(str(current_state.moisture_system.get_moisture()))
             elif cmd == '1 down':
                 current_state = IdleState(current_state)
                 current_state.user_interface.output('switched to idle \n')
@@ -95,7 +97,7 @@ def main():
                 current_state.user_interface.output('starting planting routine \n')
                 current_state = PlantingState(current_state, 5, 5)
 
-        current_state.run()
+        current_state = current_state.run()
         water_system.update()
 
         # if not sta_if.isconnected():
@@ -197,6 +199,13 @@ class MotorSystem:
         self.x_motor.normalize_position()
         self.y_motor.normalize_position()
         self.z_motor.normalize_position()
+
+    def dimensions(self):
+        dimensions = []
+        dimensions.append(self.x_motor.max_position - self.x_motor.min_position)
+        dimensions.append(self.y_motor.max_position - self.y_motor.min_position)
+        dimensions.append(self.z_motor.max_position - self.z_motor.min_position)
+        return dimensions
 
 
 class Motor:
@@ -447,6 +456,22 @@ class UserInterface:
         '''Handler for MQTT callback'''
         self.output(f'{topic}: {msg}')
         
+class MoistureSystem:
+    def __init__(self) -> None:
+        self.moisture1_pin = machine.ADC(moisture1_pin)
+        self.moisture2_pin = machine.ADC(moisture2_pin)
+        self.moisture1_pin.atten(machine.ADC.ATTN_11DB)
+        self.moisture2_pin.atten(machine.ADC.ATTN_11DB)
+
+    def get_moisture(self):
+        sum_1 = 0
+        sum_2 = 0
+        for _ in range(100):
+            sum_1 += self.moisture1_pin.read()
+            sum_2 += self.moisture2_pin.read()
+            time.sleep(.0001)
+        return [int(sum_1/100), int(sum_2/100)]
+
 
 
 # --------------------------------------------------------------------------
@@ -469,11 +494,13 @@ class ProgramState:
             self.water_system = previous_state.water_system
             self.dispenser = previous_state.dispenser
             self.user_interface = previous_state.user_interface
+            self.moisture_system = previous_state.moisture_system
         else:
             self.motor_system = MotorSystem()
             self.water_system = WaterSystem(valve_pin, flow_pin)
             self.dispenser = SeedDispenser(servo_pin)
             self.user_interface = UserInterface()
+            self.moisture_system = MoistureSystem()
     def run(self) -> 'ProgramState':
         '''Called every program cycle, ideally'''
         raise NotImplementedError
@@ -573,9 +600,9 @@ class CalibrationState(ProgramState):
         if self.x_cal_dir=='done' and self.y_cal_dir=='done' and self.z_cal_dir=='done':
             self.last_calibration = time.time()
             self.motor_system.normalize_positions()
-            current_state.user_interface.output(f'X: {-current_state.motor_system.x_motor.min_position + current_state.motor_system.x_motor.max_position}')
-            current_state.user_interface.output(f'Y: {-current_state.motor_system.y_motor.min_position + current_state.motor_system.y_motor.max_position}')
-            current_state.user_interface.output(f'Z: {-current_state.motor_system.z_motor.min_position + current_state.motor_system.z_motor.max_position}')
+            # current_state.user_interface.output(f'X: {-current_state.motor_system.x_motor.min_position + current_state.motor_system.x_motor.max_position}')
+            # current_state.user_interface.output(f'Y: {-current_state.motor_system.y_motor.min_position + current_state.motor_system.y_motor.max_position}')
+            # current_state.user_interface.output(f'Z: {-current_state.motor_system.z_motor.min_position + current_state.motor_system.z_motor.max_position}')
             return IdleState(self)
         else:
             return self
@@ -587,22 +614,29 @@ class CalibrationState(ProgramState):
 class WateringState(ProgramState):
     def __init__(self, previous_state: 'ProgramState' = None):
         super().__init__(previous_state)
-        self.sub_state = 'positioning'
+        self.sub_state = 'initial'
         # TODO: Figure out ml per step.
-        self.ml_per_step = 10
+        self.ml_per_segment = 100
         self.water_system.last_water = time.time()
+
+        zones = 6
+        zone_width = math.floor(self.motor_system.dimensions()[0]/zones)
+        self.target_positions = [zone_width*i for i in range(7)]
+        self.target_i = 0
+
     def run(self):
         # Position the gantry at the starting position
-        if self.sub_state == 'positioning':
-            self.motor_system.set_target(self.motor_system.x_motor.min_position+10, None, None)
+        if self.sub_state == 'initial':
+            self.motor_system.set_target(self.target_positions[0], None, None)
             self.motor_system.update()
             if self.motor_system.at_target():
+                self.user_interface.output('reached starting position, now watering \n')
+                self.pulse_start_time = time.time()
+                self.water_system.dispense(100)
+                self.last_dispense_i = 0
                 self.sub_state = 'watering'
-                self.user_interface.output('(watering) done positioning, now watering \n')
         # Run the actual watering process
         if self.sub_state == 'watering':
-            # TODO: This needs worked out
-            self.water_system.dispense(self.ml_per_step * (self.motor_system.x_motor.max_position-self.motor_system.x_motor.min_position))
             self.water_system.update()
             # Our target x position should be f/r, where f is the total flow in
             # mL, and r is the number of mL per step
