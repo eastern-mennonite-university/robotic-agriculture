@@ -65,7 +65,7 @@ def main():
         pin.irq(trigger=Pin.IRQ_FALLING, handler=motor_system.limit_handler)
     flow_pin.irq(trigger=Pin.IRQ_RISING, handler=water_system.water_pulse) 
 
-    # sta_if = do_connect()
+    sta_if = do_connect()
 
     last_update = time.time()
 
@@ -174,17 +174,17 @@ class MotorSystem:
         curr_time = time.ticks_us()
         # Debounce the switch, and make sure we aren't calibrating right now
         if time.ticks_diff(curr_time, self.last_lim)>100_000 and not isinstance(current_state, CalibrationState):
-            if str(pin)==str(xp_lim_pin):
+            if str(pin)==str(xp_lim_pin) and not xn_lim_pin.value()==0:
                 self.x_motor.set_position(self.x_motor.max_position)
-            elif str(pin)==str(xn_lim_pin):
+            elif str(pin)==str(xn_lim_pin) and not xp_lim_pin.value()==0:
                 self.x_motor.set_position(self.x_motor.min_position)
-            elif str(pin)==str(yp_lim_pin):
+            elif str(pin)==str(yp_lim_pin) and not yn_lim_pin.value()==0:
                 self.y_motor.set_position(self.y_motor.max_position)
-            elif str(pin)==str(yn_lim_pin):
+            elif str(pin)==str(yn_lim_pin) and not yp_lim_pin.value()==0:
                 self.y_motor.set_position(self.y_motor.min_position)
-            elif str(pin)==str(zp_lim_pin):
+            elif str(pin)==str(zp_lim_pin) and not zn_lim_pin.value()==0:
                 self.z_motor.set_position(self.z_motor.max_position)
-            elif str(pin)==str(zn_lim_pin):
+            elif str(pin)==str(zn_lim_pin) and not zp_lim_pin.value()==0:
                 self.z_motor.set_position(self.z_motor.min_position)
             current_state.user_interface.output('limit switch: ' + str(pin))
         self.last_lim = curr_time
