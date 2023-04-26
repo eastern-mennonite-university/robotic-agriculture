@@ -5,23 +5,6 @@ import network
 # from umqttsimple import MQTTClient
 # import ubinascii
 
-# List of things that still need done
-# - [X~] Automated go to position with stepper motors
-#    - [X] Able to go to specified position
-#    - [ ] Ramp velocity for stepper motors
-#    - [X] Limit switches and calibration
-# - [X] Solenoid valve control
-# - [X] Flow meter reading
-# - [ ] Soil sensor readings
-# - [X] Seed dispenser control
-# - [X] User interface
-# - [ ] Program States
-#    - [X] Idle State
-#    - [X] Calibration State
-#    - [ ] Watering State
-#    - [X] Planting State
-
-
 # Define all of the pins
 dir_pin = Pin(19, Pin.OUT)
 x1_step_pin = Pin(13, Pin.OUT)
