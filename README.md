@@ -1,5 +1,5 @@
 # robotic-agriculture
-This repository contains code used to control the robotic agriculture system. The most important file is [robotic-agriculture.py](robotic-agriculture.py), which is the MicroPython code that controls the entire system.
+This repository contains code used to control the robotic agriculture system. The most important file is [main.py](main.py), which is the MicroPython code that controls the entire system.
 ## Setting up environment
 
 First time:
